@@ -1,0 +1,356 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Default Dark Theme - Matches Emberly Website */
+:root {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+  --card: 222.2 84% 4.9%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222.2 84% 4.9%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 210 40% 98%;
+  --primary-foreground: 222.2 47.4% 11.2%;
+  --secondary: 217.2 32.6% 17.5%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
+  --success: 142 76% 36%;
+  --success-foreground: 210 40% 98%;
+  --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  --ring: 212.7 26.8% 83.9%;
+  --radius: 0.5rem;
+}
+
+/* Cyberpunk Neon Theme */
+[data-theme="cyberpunk-neon"] {
+  --background: 270 20% 5%;
+  --foreground: 210 40% 98%;
+  --card: 270 25% 8%;
+  --card-foreground: 210 40% 98%;
+  --popover: 270 25% 8%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 180 100% 45%;
+  --primary-foreground: 270 20% 5%;
+  --secondary: 300 100% 48%;
+  --secondary-foreground: 270 20% 5%;
+  --muted: 270 20% 18%;
+  --muted-foreground: 215 20% 65.1%;
+  --accent: 0 100% 50%;
+  --accent-foreground: 270 20% 5%;
+  --destructive: 0 100% 50%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 270 20% 14%;
+  --input: 270 20% 14%;
+  --ring: 180 100% 55%;
+}
+
+/* Hawkins Neon (Stranger Things) */
+[data-theme="hawkins-neon"] {
+  --background: 232 36% 6%;
+  --foreground: 210 40% 96%;
+  --card: 230 32% 8%;
+  --card-foreground: 210 40% 96%;
+  --popover: 230 32% 8%;
+  --popover-foreground: 210 40% 96%;
+  --primary: 354 82% 52%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 230 28% 16%;
+  --secondary-foreground: 210 40% 96%;
+  --muted: 232 20% 24%;
+  --muted-foreground: 215 16% 72%;
+  --accent: 197 92% 54%;
+  --accent-foreground: 222 47% 12%;
+  --destructive: 0 65% 46%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 230 22% 18%;
+  --input: 230 22% 18%;
+  --ring: 354 82% 56%;
+}
+
+/* Retro Arcade */
+[data-theme="retro-arcade"] {
+  --background: 280 25% 8%;
+  --foreground: 210 40% 98%;
+  --card: 280 30% 10%;
+  --card-foreground: 210 40% 98%;
+  --popover: 280 30% 10%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 300 100% 50%;
+  --primary-foreground: 280 25% 8%;
+  --secondary: 45 100% 50%;
+  --secondary-foreground: 280 25% 8%;
+  --muted: 280 20% 20%;
+  --muted-foreground: 215 20% 65.1%;
+  --accent: 0 100% 50%;
+  --accent-foreground: 280 25% 8%;
+  --destructive: 0 100% 50%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 280 20% 16%;
+  --input: 280 20% 16%;
+  --ring: 300 100% 60%;
+}
+
+/* Dark Matrix */
+[data-theme="dark-matrix"] {
+  --background: 120 40% 5%;
+  --foreground: 120 100% 90%;
+  --card: 120 35% 7%;
+  --card-foreground: 120 100% 90%;
+  --popover: 120 35% 7%;
+  --popover-foreground: 120 100% 90%;
+  --primary: 120 100% 50%;
+  --primary-foreground: 120 40% 5%;
+  --secondary: 220 30% 15%;
+  --secondary-foreground: 120 100% 90%;
+  --muted: 120 30% 16%;
+  --muted-foreground: 120 80% 70%;
+  --accent: 60 100% 50%;
+  --accent-foreground: 120 40% 5%;
+  --destructive: 0 100% 45%;
+  --destructive-foreground: 120 100% 90%;
+  --border: 120 30% 12%;
+  --input: 120 30% 12%;
+  --ring: 120 100% 60%;
+}
+
+/* Vaporwave */
+[data-theme="vaporwave"] {
+  --background: 300 40% 8%;
+  --foreground: 210 40% 98%;
+  --card: 300 35% 10%;
+  --card-foreground: 210 40% 98%;
+  --popover: 300 35% 10%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 280 80% 50%;
+  --primary-foreground: 300 40% 8%;
+  --secondary: 40 100% 50%;
+  --secondary-foreground: 300 40% 8%;
+  --muted: 300 30% 20%;
+  --muted-foreground: 215 20% 65.1%;
+  --accent: 200 100% 50%;
+  --accent-foreground: 300 40% 8%;
+  --destructive: 20 100% 50%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 300 30% 16%;
+  --input: 300 30% 16%;
+  --ring: 280 80% 60%;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scrollbar-gutter: stable;
+  overflow-y: scroll;
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+}
+
+/* Glassmorphism Effects - Emberly Design System */
+.glass {
+  background-color: hsl(var(--background) / 0.8);
+  backdrop-filter: blur(16px);
+  border: 1px solid hsl(var(--border) / 0.5);
+}
+
+.glass-hover {
+  transition: all 200ms ease;
+}
+
+.glass-hover:hover {
+  background-color: hsl(var(--background) / 0.9);
+}
+
+.glass-card {
+  background-color: hsl(var(--card) / 0.8);
+  backdrop-filter: blur(16px);
+  border: 1px solid hsl(var(--border) / 0.5);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+  transition: all 200ms ease;
+}
+
+.glass-card:hover {
+  border-color: hsl(var(--primary) / 0.3);
+}
+
+/* Custom Gradients - From Emberly Site */
+.gradient-border {
+  border: 1px solid transparent;
+  background: linear-gradient(to right, hsl(var(--primary) / 0.5), hsl(var(--primary) / 0.25), transparent);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+}
+
+.gradient-bg {
+  background: linear-gradient(
+    to bottom right,
+    hsl(var(--background)),
+    hsl(var(--background) / 0.95),
+    hsl(var(--primary) / 0.1)
+  );
+}
+
+/* Upload zone */
+.upload-zone {
+  background-color: hsl(var(--card) / 0.5);
+  border: 2px dashed hsl(var(--border));
+  border-radius: var(--radius);
+  transition: all 200ms ease;
+}
+
+.upload-zone:hover,
+.upload-zone.dragging {
+  border-color: hsl(var(--primary));
+  background: hsl(var(--primary) / 0.05);
+}
+
+/* Button styles matching Emberly */
+.btn-primary {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: none;
+  border-radius: var(--radius);
+  font-weight: 500;
+  transition: all 200ms ease;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
+.btn-secondary {
+  background-color: hsl(var(--secondary));
+  color: hsl(var(--secondary-foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  font-weight: 500;
+  transition: all 200ms ease;
+}
+
+.btn-secondary:hover {
+  background-color: hsl(var(--secondary) / 0.8);
+}
+
+/* Input styles */
+.input-field {
+  background-color: hsl(var(--background));
+  border: 1px solid hsl(var(--input));
+  border-radius: var(--radius);
+  color: hsl(var(--foreground));
+  transition: all 200ms ease;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: hsl(var(--ring));
+  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2);
+}
+
+/* Badge styles */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 9999px;
+  background: hsl(var(--primary) / 0.15);
+  color: hsl(var(--primary));
+}
+
+/* Input number spinner removal */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type='number'] {
+  -moz-appearance: textfield;
+}
+
+/* Custom scrollbar - matching Emberly site */
+::-webkit-scrollbar {
+  width: 14px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--muted-foreground));
+  border: 4px solid transparent;
+  background-clip: padding-box;
+  border-radius: 9999px;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground)) transparent;
+}
+
+/* Animations - From Emberly globals */
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.5s ease-out;
+}
+
+.animate-pulse-soft {
+  animation: pulseSoft 2s ease-in-out infinite;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulseSoft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
