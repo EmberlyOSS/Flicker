@@ -2,13 +2,13 @@
 
 <div align="center">
 
-![Emberly Logo](https://embrly.ca/icon.svg)
+![App Preview](./public/preview.png)
 
 **A powerful, ShareX like desktop uploader for [Emberly](https://embrly.ca)**
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Us-7289da?logo=discord&logoColor=white)](https://embrly.ca/discord)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](https://github.com/EmberlyOSS/Website)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](https://github.com/EmberlyOSS/Flicker)
 
 </div>
 
@@ -29,7 +29,7 @@
 
 ### Download
 
-Download the latest release for your platform from the [Releases](https://github.com/EmberlyOSS/Website/releases) page.
+Download the latest release for your platform from the [Releases](https://github.com/EmberlyOSS/Flicker/releases) page.
 
 | Platform | Download |
 |----------|----------|
@@ -46,8 +46,8 @@ Prerequisites:
 
 ```bash
 # Clone the repository
-git clone https://github.com/EmberlyOSS/EmberShare.git
-cd Website/uploader
+git clone https://github.com/EmberlyOSS/Flicker.git
+cd Flicker/uploader
 
 # Install dependencies
 bun install
@@ -127,8 +127,8 @@ Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before participating in ou
 
 ## 🐛 Bug Reports & Feature Requests
 
-- **Bug Reports**: [Open an issue](https://github.com/EmberlyOSS/Website/issues/new?template=bug_report.md)
-- **Feature Requests**: [Open an issue](https://github.com/EmberlyOSS/Website/issues/new?template=feature_request.md)
+- **Bug Reports**: [Open an issue](https://github.com/EmberlyOSS/Flicker/issues/new?template=bug_report.md)
+- **Feature Requests**: [Open an issue](https://github.com/EmberlyOSS/Flicker/issues/new?template=feature_request.md)
 - **Questions**: Join our [Discord](https://embrly.ca/discord)
 
 ## 📄 License

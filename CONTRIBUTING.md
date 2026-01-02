@@ -31,14 +31,14 @@ Before you begin, ensure you have the following installed:
 ### Fork and Clone
 
 1. Fork the repository on GitHub
-2. Clone your fork locally:
+3. Clone your fork locally:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/Website.git
-   cd Website/uploader
+   git clone https://github.com/YOUR_USERNAME/Flicker.git
+   cd Flicker/uploader
    ```
 3. Add the upstream remote:
    ```bash
-   git remote add upstream https://github.com/EmberlyOSS/Website.git
+   git remote add upstream https://github.com/EmberlyOSS/Flicker.git
    ```
 
 ## 💡 How Can I Contribute?

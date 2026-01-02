@@ -4,7 +4,8 @@ Thank you for helping keep Flicker and Emberly secure. This document explains ho
 
 ## Reporting a Vulnerability
 
-- Please report security issues privately to: security@embrly.ca
+- Preferred: Submit a private security report via GitHub Security Advisories for this repository: https://github.com/EmberlyOSS/Flicker/security/advisories
+- Alternatively, you may email security@embrly.ca for confidential reports.
 - For non-sensitive discussion or triage, you may also contact us on Discord: https://embrly.ca/discord
 - Do NOT post vulnerabilities publicly (issues, PRs, or social media).
 
@@ -13,7 +14,7 @@ When reporting, include:
 - Steps to reproduce (minimal repro if possible)
 - Affected versions or commit hashes
 - Any PoC code or screenshots
-- Your contact email for follow-up
+- Your contact email for follow-up (if not using GitHub Advisories)
 
 We will acknowledge reports within 48 hours and provide an estimated timeline for remediation.
 
@@ -45,4 +46,4 @@ We ask researchers to follow responsible disclosure: do not exploit or exfiltrat
 
 ---
 
-If you have questions about this policy, email security@embrly.ca.
+If you have questions about this policy, open an issue on the Flicker repo or email security@embrly.ca.

@@ -1,11 +1,48 @@
-import { useEffect, useState } from 'react'
-import { DEFAULT_COLORS, THEME_PRESETS, type ColorConfig } from '../colors'
+import { useEffect, useState, useMemo } from 'react'
+import { DEFAULT_COLORS, THEME_PRESETS, type ColorConfig, hslToHex } from '../colors'
 
 const THEME_STORAGE_KEY = 'emberly-uploader-theme'
+
+/**
+ * Convert HSL string (e.g., "222.2 84% 4.9%") to hex color
+ */
+function hslStringToHex(hslString: string): string {
+  const parts = hslString.split(' ')
+  if (parts.length >= 3) {
+    const h = parseFloat(parts[0])
+    const s = parseFloat(parts[1].replace('%', ''))
+    const l = parseFloat(parts[2].replace('%', ''))
+    return hslToHex(h, s, l)
+  }
+  return '#000000'
+}
+
+export interface ThemePreset {
+  name: string
+  label: string
+  description: string
+  primary: string
+  secondary: string
+  background: string
+  colors: ColorConfig
+}
 
 export function useTheme() {
   const [currentTheme, setCurrentTheme] = useState('Default Dark')
   const [colors, setColors] = useState<ColorConfig>(DEFAULT_COLORS)
+
+  // Transform presets to include hex colors for UI previews
+  const presets: ThemePreset[] = useMemo(() => 
+    THEME_PRESETS.map(preset => ({
+      name: preset.name,
+      label: preset.name,
+      description: preset.description,
+      primary: hslStringToHex(preset.colors.primary),
+      secondary: hslStringToHex(preset.colors.secondary),
+      background: hslStringToHex(preset.colors.background),
+      colors: preset.colors,
+    })),
+  [])
 
   // Load theme from localStorage on mount
   useEffect(() => {

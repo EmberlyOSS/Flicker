@@ -1,0 +1,28 @@
+.desktop-sidebar {
+  width: 260px;
+  max-width: 100%;
+  display: none;
+}
+
+/* Only show on large screens (desktop) */
+@media (min-width: 1025px) {
+  .desktop-sidebar {
+    display: flex !important;
+  }
+}
+
+@media (min-width: 1025px) and (max-width: 1200px) {
+  .desktop-sidebar {
+    width: 240px;
+  }
+
+  .desktop-sidebar h2 {
+    font-size: 0.95rem;
+  }
+
+  .desktop-sidebar button {
+    font-size: 0.875rem;
+    padding: 0.625rem 1rem;
+  }
+}
+

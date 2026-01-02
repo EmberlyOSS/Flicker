@@ -1,0 +1,48 @@
+.mobile-header {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+}
+
+.mobile-menu {
+  max-height: 80vh;
+}
+
+.mobile-action-bar {
+  display: none;
+}
+
+/* Tablet and down - show mobile header, hide desktop sidebar */
+@media (max-width: 1024px) {
+  .mobile-header {
+    display: block;
+  }
+
+  .mobile-action-bar {
+    display: flex;
+  }
+
+  .desktop-sidebar {
+    display: none !important;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+}
+
+/* Small devices - optimize touch targets */
+@media (max-width: 640px) {
+  .mobile-menu button,
+  .mobile-header button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .mobile-menu {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+}

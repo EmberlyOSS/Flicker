@@ -176,49 +176,163 @@ body {
   }
 }
 
-/* Glassmorphism Effects - Emberly Design System */
+/* Glassmorphism Effects - Enhanced Liquid Glass Design System */
 .glass {
-  background-color: hsl(var(--background) / 0.8);
-  backdrop-filter: blur(16px);
-  border: 1px solid hsl(var(--border) / 0.5);
+  background: linear-gradient(
+    135deg,
+    hsl(var(--background) / 0.85) 0%,
+    hsl(var(--background) / 0.75) 50%,
+    hsl(var(--background) / 0.85) 100%
+  );
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid hsl(var(--border) / 0.4);
+  box-shadow: 
+    0 8px 32px hsl(var(--background) / 0.4),
+    inset 0 1px 0 hsl(var(--foreground) / 0.05);
 }
 
 .glass-hover {
-  transition: all 200ms ease;
+  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .glass-hover:hover {
-  background-color: hsl(var(--background) / 0.9);
+  background: linear-gradient(
+    135deg,
+    hsl(var(--background) / 0.9) 0%,
+    hsl(var(--background) / 0.8) 50%,
+    hsl(var(--background) / 0.9) 100%
+  );
+  border-color: hsl(var(--primary) / 0.3);
+  box-shadow: 
+    0 12px 40px hsl(var(--background) / 0.5),
+    0 0 20px hsl(var(--primary) / 0.1),
+    inset 0 1px 0 hsl(var(--foreground) / 0.08);
 }
 
 .glass-card {
-  background-color: hsl(var(--card) / 0.8);
-  backdrop-filter: blur(16px);
-  border: 1px solid hsl(var(--border) / 0.5);
-  border-radius: var(--radius);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
-  transition: all 200ms ease;
+  background: linear-gradient(
+    145deg,
+    hsl(var(--card) / 0.9) 0%,
+    hsl(var(--card) / 0.7) 100%
+  );
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid hsl(var(--border) / 0.3);
+  border-radius: calc(var(--radius) * 1.5);
+  box-shadow: 
+    0 4px 24px hsl(var(--background) / 0.4),
+    0 1px 2px hsl(var(--background) / 0.3),
+    inset 0 1px 0 hsl(var(--foreground) / 0.04);
+  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+  border-color: hsl(var(--primary) / 0.25);
+  box-shadow: 
+    0 8px 32px hsl(var(--background) / 0.5),
+    0 0 0 1px hsl(var(--primary) / 0.1),
+    inset 0 1px 0 hsl(var(--foreground) / 0.06);
+  transform: translateY(-1px);
+}
+
+/* Liquid Glass Button */
+.glass-button {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--primary) / 0.9) 0%,
+    hsl(var(--primary) / 0.75) 100%
+  );
+  backdrop-filter: blur(12px);
+  border: 1px solid hsl(var(--primary) / 0.3);
+  border-radius: calc(var(--radius) * 1.25);
+  box-shadow: 
+    0 4px 16px hsl(var(--primary) / 0.25),
+    inset 0 1px 0 hsl(var(--foreground) / 0.15);
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 24px hsl(var(--primary) / 0.35),
+    inset 0 1px 0 hsl(var(--foreground) / 0.2);
+}
+
+.glass-button:active {
+  transform: translateY(0);
+  box-shadow: 
+    0 2px 8px hsl(var(--primary) / 0.2),
+    inset 0 1px 0 hsl(var(--foreground) / 0.1);
+}
+
+/* Subtle Glow Effect */
+.glow {
+  position: relative;
+}
+
+.glow::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    hsl(var(--primary) / 0.4) 0%,
+    transparent 50%,
+    hsl(var(--primary) / 0.2) 100%
+  );
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+
+.glow:hover::before {
+  opacity: 1;
+}
 }
 
 .glass-card:hover {
   border-color: hsl(var(--primary) / 0.3);
 }
 
-/* Custom Gradients - From Emberly Site */
+/* Custom Gradients - Enhanced with Liquid Glass Feel */
 .gradient-border {
+  position: relative;
   border: 1px solid transparent;
-  background: linear-gradient(to right, hsl(var(--primary) / 0.5), hsl(var(--primary) / 0.25), transparent);
-  background-origin: border-box;
-  background-clip: padding-box, border-box;
+  background: linear-gradient(hsl(var(--card)), hsl(var(--card))) padding-box,
+              linear-gradient(135deg, hsl(var(--primary) / 0.5), hsl(var(--primary) / 0.1), hsl(var(--primary) / 0.3)) border-box;
 }
 
 .gradient-bg {
+  background: 
+    radial-gradient(ellipse 80% 50% at 50% -20%, hsl(var(--primary) / 0.15), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 100%, hsl(var(--primary) / 0.08), transparent),
+    linear-gradient(
+      to bottom,
+      hsl(var(--background)) 0%,
+      hsl(var(--background) / 0.98) 50%,
+      hsl(var(--background)) 100%
+    );
+  min-height: 100vh;
+}
+
+/* Animated gradient background for special elements */
+.gradient-animated {
   background: linear-gradient(
-    to bottom right,
+    -45deg,
+    hsl(var(--primary) / 0.1),
     hsl(var(--background)),
-    hsl(var(--background) / 0.95),
-    hsl(var(--primary) / 0.1)
+    hsl(var(--primary) / 0.05),
+    hsl(var(--background))
   );
+  background-size: 400% 400%;
+  animation: gradientShift 15s ease infinite;
+}
+
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
 }
 
 /* Upload zone */

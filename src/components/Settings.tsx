@@ -292,7 +292,21 @@ export function Settings({ config, onSave, isOpen, onClose, onLogout, onLogin }:
                   placeholder="Click to set hotkey"
                 />
                 <p className="text-xs text-muted-foreground mt-1.5">
-                  Captures entire screen and uploads automatically
+                  Captures primary monitor and uploads automatically
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  🖥️ All Monitors Screenshot
+                </label>
+                <HotkeyInput
+                  value={formData.hotkeys?.screenshotAllMonitors || ''}
+                  onChange={(value) => handleHotkeyChange('screenshotAllMonitors', value)}
+                  placeholder="Click to set hotkey"
+                />
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  Captures all monitors combined into one image
                 </p>
               </div>
 

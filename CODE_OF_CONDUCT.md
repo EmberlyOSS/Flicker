@@ -51,10 +51,12 @@ project may be further defined and clarified by project maintainers.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported by contacting the project team at conduct@embrly.ca. All reports will
-be reviewed and investigated and will result in a response that is deemed
-necessary and appropriate to the circumstances. The project team is obligated
-to maintain confidentiality with regard to the reporter of an incident.
+reported by opening an issue at https://github.com/EmberlyOSS/Flicker/issues,
+or by contacting the project maintainers via GitHub. Reports may also be
+sent by email to conduct@embrly.ca. All reports will be reviewed and
+investigated and will result in a response that is deemed necessary and
+appropriate to the circumstances. The project maintainers are obligated to
+maintain confidentiality with regard to the reporter of an incident.
 
 ## Attribution
 
