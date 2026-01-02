@@ -34,8 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **2FA Support** - Two-factor authentication (TOTP) support
 - **Visibility Control** - Set default upload visibility (Public/Private)
 - **Password Protection** - Optional password protection for uploads
-- **Theme System** - Multiple built-in themes
-  - Default (dark)
+- **Theme System** - 15 built-in themes with Stranger Things as default
+  - Stranger Things (default) - Red neon with cyan accents
+  - Emberly Classic - Purple gradient theme
   - Cyberpunk Neon
   - Ocean Depths
   - Forest Twilight
@@ -43,8 +44,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Midnight Purple
   - Arctic Frost
   - Rose Gold
+  - Dracula
+  - Tokyo Night
+  - Nord
+  - Rose Pine
+  - Catppuccin Mocha
+  - Ocean Deep
+- **Logo Component** - Reusable Emberly flame logo with customizable colors
+- **Enhanced Splash Screen** - Polished loading experience
+  - Rotating fun facts, tips, and easter eggs (50+ messages)
+  - Multi-phase loading sequence with smooth progress animations
+  - Spinning logo animation with glowing rings
+  - Shimmer effect on progress bar
+  - Animated background particles
+  - Stranger Things and meme references
+- **Enhanced Headers** - Improved desktop and mobile navigation
+  - Upload count badge with quick access to history
+  - User avatar and name display when signed in
+  - Welcome message and sign-in prompt for guests
+  - Version badge in mobile header
 - **System Tray** - Minimize to system tray for background operation
-- **Upload History** - View recent uploads with timestamps
+- **Upload History** - View recent uploads with thumbnails and pagination
 - **Settings Panel** - Comprehensive settings for hotkeys, uploads, and appearance
 - **Cross-Platform** - Support for Windows, macOS, and Linux
 
@@ -54,6 +74,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rust backend with multi-threaded upload support
 - Local file storage for screenshots with unique naming
 - Configuration persistence using localStorage
+- HSL-based theme system with automatic hex conversion for UI previews
+- Smooth eased animations using requestAnimationFrame
 
 ---
 
