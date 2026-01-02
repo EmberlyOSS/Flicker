@@ -27,33 +27,7 @@ export interface ColorConfig {
 }
 
 /**
- * Default Emberly Dark Theme Colors
- * Dark midnight blue base with bright foregrounds
- */
-export const DEFAULT_COLORS: ColorConfig = {
-  background: '222.2 84% 4.9%',
-  foreground: '210 40% 98%',
-  card: '222.2 84% 4.9%',
-  cardForeground: '210 40% 98%',
-  popover: '222.2 84% 4.9%',
-  popoverForeground: '210 40% 98%',
-  primary: '210 40% 98%',
-  primaryForeground: '222.2 47.4% 11.2%',
-  secondary: '217.2 32.6% 17.5%',
-  secondaryForeground: '210 40% 98%',
-  muted: '217.2 32.6% 17.5%',
-  mutedForeground: '215 20.2% 65.1%',
-  accent: '217.2 32.6% 17.5%',
-  accentForeground: '210 40% 98%',
-  destructive: '0 62.8% 30.6%',
-  destructiveForeground: '210 40% 98%',
-  border: '217.2 32.6% 17.5%',
-  input: '217.2 32.6% 17.5%',
-  ring: '212.7 26.8% 83.9%',
-}
-
-/**
- * Stranger Things Theme - Purple/Red/Cyan neon
+ * Stranger Things Theme - Purple/Red/Cyan neon (DEFAULT)
  */
 export const STRANGER_THINGS_THEME: ColorConfig = {
   background: '232 36% 6%',
@@ -75,6 +49,35 @@ export const STRANGER_THINGS_THEME: ColorConfig = {
   border: '230 30% 14%',
   input: '230 30% 14%',
   ring: '197 100% 60%',
+}
+
+// Default colors are now the Stranger Things theme
+export const DEFAULT_COLORS: ColorConfig = STRANGER_THINGS_THEME
+
+/**
+ * Emberly Classic Dark Theme
+ * Dark midnight blue base with bright foregrounds
+ */
+export const EMBERLY_CLASSIC_THEME: ColorConfig = {
+  background: '222.2 84% 4.9%',
+  foreground: '210 40% 98%',
+  card: '222.2 84% 4.9%',
+  cardForeground: '210 40% 98%',
+  popover: '222.2 84% 4.9%',
+  popoverForeground: '210 40% 98%',
+  primary: '210 40% 98%',
+  primaryForeground: '222.2 47.4% 11.2%',
+  secondary: '217.2 32.6% 17.5%',
+  secondaryForeground: '210 40% 98%',
+  muted: '217.2 32.6% 17.5%',
+  mutedForeground: '215 20.2% 65.1%',
+  accent: '217.2 32.6% 17.5%',
+  accentForeground: '210 40% 98%',
+  destructive: '0 62.8% 30.6%',
+  destructiveForeground: '210 40% 98%',
+  border: '217.2 32.6% 17.5%',
+  input: '217.2 32.6% 17.5%',
+  ring: '212.7 26.8% 83.9%',
 }
 
 /**
@@ -228,17 +231,199 @@ export const VAPORWAVE_THEME: ColorConfig = {
 }
 
 /**
+ * Dracula Theme - Purple/Pink/Green
+ */
+export const DRACULA_THEME: ColorConfig = {
+  background: '231 15% 18%',
+  foreground: '60 30% 96%',
+  card: '232 14% 20%',
+  cardForeground: '60 30% 96%',
+  popover: '232 14% 20%',
+  popoverForeground: '60 30% 96%',
+  primary: '265 89% 78%',
+  primaryForeground: '231 15% 18%',
+  secondary: '225 27% 28%',
+  secondaryForeground: '60 30% 96%',
+  muted: '232 14% 25%',
+  mutedForeground: '228 8% 62%',
+  accent: '135 94% 65%',
+  accentForeground: '231 15% 18%',
+  destructive: '0 100% 67%',
+  destructiveForeground: '60 30% 96%',
+  border: '225 27% 24%',
+  input: '225 27% 24%',
+  ring: '265 89% 78%',
+}
+
+/**
+ * Tokyo Night Theme - Deep blue with purple accents
+ */
+export const TOKYO_NIGHT_THEME: ColorConfig = {
+  background: '235 21% 13%',
+  foreground: '220 13% 91%',
+  card: '235 21% 15%',
+  cardForeground: '220 13% 91%',
+  popover: '235 21% 15%',
+  popoverForeground: '220 13% 91%',
+  primary: '252 87% 67%',
+  primaryForeground: '235 21% 13%',
+  secondary: '230 20% 20%',
+  secondaryForeground: '220 13% 91%',
+  muted: '235 18% 22%',
+  mutedForeground: '217 11% 65%',
+  accent: '188 97% 66%',
+  accentForeground: '235 21% 13%',
+  destructive: '348 100% 61%',
+  destructiveForeground: '220 13% 91%',
+  border: '234 18% 19%',
+  input: '234 18% 19%',
+  ring: '252 87% 67%',
+}
+
+/**
+ * Nord Theme - Arctic, bluish-gray
+ */
+export const NORD_THEME: ColorConfig = {
+  background: '220 16% 22%',
+  foreground: '218 27% 92%',
+  card: '220 16% 24%',
+  cardForeground: '218 27% 92%',
+  popover: '220 16% 24%',
+  popoverForeground: '218 27% 92%',
+  primary: '193 43% 67%',
+  primaryForeground: '220 16% 22%',
+  secondary: '220 16% 28%',
+  secondaryForeground: '218 27% 92%',
+  muted: '220 16% 30%',
+  mutedForeground: '219 28% 75%',
+  accent: '179 25% 65%',
+  accentForeground: '220 16% 22%',
+  destructive: '354 42% 56%',
+  destructiveForeground: '218 27% 92%',
+  border: '220 16% 28%',
+  input: '220 16% 28%',
+  ring: '193 43% 67%',
+}
+
+/**
+ * Sunset Theme - Orange/Pink/Purple gradient feel
+ */
+export const SUNSET_THEME: ColorConfig = {
+  background: '260 30% 8%',
+  foreground: '30 100% 96%',
+  card: '260 28% 10%',
+  cardForeground: '30 100% 96%',
+  popover: '260 28% 10%',
+  popoverForeground: '30 100% 96%',
+  primary: '25 95% 55%',
+  primaryForeground: '260 30% 8%',
+  secondary: '320 70% 50%',
+  secondaryForeground: '30 100% 96%',
+  muted: '260 25% 18%',
+  mutedForeground: '30 30% 65%',
+  accent: '340 82% 52%',
+  accentForeground: '30 100% 96%',
+  destructive: '0 75% 50%',
+  destructiveForeground: '30 100% 96%',
+  border: '260 25% 14%',
+  input: '260 25% 14%',
+  ring: '25 95% 60%',
+}
+
+/**
+ * Ocean Deep Theme - Deep sea blues and teals
+ */
+export const OCEAN_DEEP_THEME: ColorConfig = {
+  background: '200 50% 6%',
+  foreground: '185 30% 94%',
+  card: '200 48% 8%',
+  cardForeground: '185 30% 94%',
+  popover: '200 48% 8%',
+  popoverForeground: '185 30% 94%',
+  primary: '185 80% 45%',
+  primaryForeground: '200 50% 6%',
+  secondary: '210 60% 25%',
+  secondaryForeground: '185 30% 94%',
+  muted: '200 40% 18%',
+  mutedForeground: '185 25% 65%',
+  accent: '170 75% 40%',
+  accentForeground: '200 50% 6%',
+  destructive: '0 70% 50%',
+  destructiveForeground: '185 30% 94%',
+  border: '200 40% 14%',
+  input: '200 40% 14%',
+  ring: '185 80% 50%',
+}
+
+/**
+ * Rose Pine Theme - Soft, warm rose colors
+ */
+export const ROSE_PINE_THEME: ColorConfig = {
+  background: '249 22% 12%',
+  foreground: '245 50% 91%',
+  card: '249 22% 14%',
+  cardForeground: '245 50% 91%',
+  popover: '249 22% 14%',
+  popoverForeground: '245 50% 91%',
+  primary: '330 59% 69%',
+  primaryForeground: '249 22% 12%',
+  secondary: '249 12% 22%',
+  secondaryForeground: '245 50% 91%',
+  muted: '247 16% 20%',
+  mutedForeground: '245 10% 60%',
+  accent: '189 43% 73%',
+  accentForeground: '249 22% 12%',
+  destructive: '343 76% 68%',
+  destructiveForeground: '245 50% 91%',
+  border: '247 16% 18%',
+  input: '247 16% 18%',
+  ring: '330 59% 69%',
+}
+
+/**
+ * Catppuccin Mocha Theme - Warm pastel colors
+ */
+export const CATPPUCCIN_MOCHA_THEME: ColorConfig = {
+  background: '240 21% 15%',
+  foreground: '226 64% 88%',
+  card: '240 21% 17%',
+  cardForeground: '226 64% 88%',
+  popover: '240 21% 17%',
+  popoverForeground: '226 64% 88%',
+  primary: '267 84% 81%',
+  primaryForeground: '240 21% 15%',
+  secondary: '237 16% 23%',
+  secondaryForeground: '226 64% 88%',
+  muted: '236 16% 25%',
+  mutedForeground: '228 24% 72%',
+  accent: '115 54% 76%',
+  accentForeground: '240 21% 15%',
+  destructive: '343 81% 75%',
+  destructiveForeground: '226 64% 88%',
+  border: '237 16% 21%',
+  input: '237 16% 21%',
+  ring: '267 84% 81%',
+}
+
+/**
  * Theme presets for easy switching
  */
 export const THEME_PRESETS = [
-  { name: 'Default Dark', colors: DEFAULT_COLORS, description: 'Emberly default - midnight blue' },
-  { name: 'Stranger Things', colors: STRANGER_THINGS_THEME, description: 'Purple/red neon theme' },
-  { name: 'Christmas', colors: CHRISTMAS_THEME, description: 'Red/green holiday theme' },
-  { name: 'Pride', colors: PRIDE_THEME, description: 'Rainbow pride colors' },
-  { name: 'Aurora Borealis', colors: AURORA_BOREALIS_THEME, description: 'Cyan/green aurora lights' },
+  { name: 'Stranger Things', colors: STRANGER_THINGS_THEME, description: 'Red neon - Hawkins vibes' },
+  { name: 'Emberly Classic', colors: EMBERLY_CLASSIC_THEME, description: 'Original midnight blue' },
+  { name: 'Dracula', colors: DRACULA_THEME, description: 'Classic purple vampire' },
+  { name: 'Tokyo Night', colors: TOKYO_NIGHT_THEME, description: 'Deep blue, purple accents' },
+  { name: 'Nord', colors: NORD_THEME, description: 'Arctic bluish-gray' },
+  { name: 'Rose Pine', colors: ROSE_PINE_THEME, description: 'Soft warm rose tones' },
+  { name: 'Catppuccin', colors: CATPPUCCIN_MOCHA_THEME, description: 'Warm pastel mocha' },
   { name: 'Cyberpunk Neon', colors: CYBERPUNK_NEON_THEME, description: 'Cyan/magenta neon' },
-  { name: 'Dark Matrix', colors: DARK_MATRIX_THEME, description: 'Green code theme' },
-  { name: 'Vaporwave', colors: VAPORWAVE_THEME, description: 'Purple/pink/cyan aesthetic' },
+  { name: 'Vaporwave', colors: VAPORWAVE_THEME, description: 'Purple/pink aesthetic' },
+  { name: 'Dark Matrix', colors: DARK_MATRIX_THEME, description: 'Green code hacker' },
+  { name: 'Aurora Borealis', colors: AURORA_BOREALIS_THEME, description: 'Cyan/green lights' },
+  { name: 'Sunset', colors: SUNSET_THEME, description: 'Orange/pink warmth' },
+  { name: 'Ocean Deep', colors: OCEAN_DEEP_THEME, description: 'Deep sea blues' },
+  { name: 'Christmas', colors: CHRISTMAS_THEME, description: 'Festive red/green' },
+  { name: 'Pride', colors: PRIDE_THEME, description: 'Rainbow colors' },
 ]
 
 /**

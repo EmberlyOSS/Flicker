@@ -2,29 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Default Dark Theme - Matches Emberly Website */
+/* Default Theme - Stranger Things (Hawkins Neon) */
 :root {
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
-  --card: 222.2 84% 4.9%;
-  --card-foreground: 210 40% 98%;
-  --popover: 222.2 84% 4.9%;
-  --popover-foreground: 210 40% 98%;
-  --primary: 210 40% 98%;
-  --primary-foreground: 222.2 47.4% 11.2%;
-  --secondary: 217.2 32.6% 17.5%;
-  --secondary-foreground: 210 40% 98%;
-  --muted: 217.2 32.6% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
-  --accent: 217.2 32.6% 17.5%;
-  --accent-foreground: 210 40% 98%;
-  --destructive: 0 62.8% 30.6%;
+  --background: 232 36% 6%;
+  --foreground: 210 40% 96%;
+  --card: 230 32% 8%;
+  --card-foreground: 210 40% 96%;
+  --popover: 230 32% 8%;
+  --popover-foreground: 210 40% 96%;
+  --primary: 354 82% 52%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 230 28% 16%;
+  --secondary-foreground: 210 40% 96%;
+  --muted: 232 20% 24%;
+  --muted-foreground: 215 16% 72%;
+  --accent: 197 92% 54%;
+  --accent-foreground: 222 47% 12%;
+  --destructive: 354 82% 45%;
   --destructive-foreground: 210 40% 98%;
   --success: 142 76% 36%;
   --success-foreground: 210 40% 98%;
-  --border: 217.2 32.6% 17.5%;
-  --input: 217.2 32.6% 17.5%;
-  --ring: 212.7 26.8% 83.9%;
+  --border: 230 30% 14%;
+  --input: 230 30% 14%;
+  --ring: 197 100% 60%;
   --radius: 0.5rem;
 }
 

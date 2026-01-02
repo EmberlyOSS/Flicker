@@ -1,20 +1,28 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { AppConfig, HotkeyConfig } from '../types'
 import { 
   Save, Eye, EyeOff, User, LogOut, Palette, Cog, Keyboard, 
   AlertTriangle, Info, Github, Heart, ExternalLink, Check,
-  Monitor, Bell, Lock, Upload, Globe
+  Monitor, Bell, Lock, Upload, Globe, RefreshCw, Download,
+  Terminal, Trash2, Copy, Bug
 } from 'lucide-react'
 import { useTheme, ThemePreset } from '../hooks/useTheme'
 import { DEFAULT_HOTKEYS } from '../config'
 import { HotkeyInput } from './HotkeyInput'
+import { Logo } from './Logo'
 import { APP_NAME, APP_VERSION } from '../constants'
+import { UpdateInfo } from '../hooks/useUpdater'
 
 interface SettingsPageProps {
   config: AppConfig
   onSave: (config: AppConfig) => void
   onLogout?: () => void
   onLogin?: () => void
+  // Update props
+  updateInfo?: UpdateInfo
+  checkingForUpdates?: boolean
+  onCheckForUpdates?: () => void
+  onDownloadUpdate?: () => void
 }
 
 // Theme preview component with live color swatches
@@ -97,12 +105,57 @@ function SettingsSection({
   )
 }
 
-export function SettingsPage({ config, onSave, onLogout, onLogin }: SettingsPageProps) {
+export function SettingsPage({ 
+  config, 
+  onSave, 
+  onLogout, 
+  onLogin,
+  updateInfo,
+  checkingForUpdates,
+  onCheckForUpdates,
+  onDownloadUpdate,
+}: SettingsPageProps) {
   const [formData, setFormData] = useState(config)
   const [showPassword, setShowPassword] = useState(false)
   const [activeTab, setActiveTab] = useState<'account' | 'upload' | 'hotkeys' | 'appearance' | 'about'>('account')
   const [saveSuccess, setSaveSuccess] = useState(false)
+  const [debugLogs, setDebugLogs] = useState<string[]>([])
+  const [showDebugPanel, setShowDebugPanel] = useState(false)
   const { currentTheme, switchTheme, presets } = useTheme()
+
+  // Capture console logs for debug panel
+  useEffect(() => {
+    const originalConsoleLog = console.log
+    const originalConsoleError = console.error
+    const originalConsoleWarn = console.warn
+
+    const addLog = (type: string, ...args: any[]) => {
+      const timestamp = new Date().toLocaleTimeString()
+      const message = args.map(arg => 
+        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+      ).join(' ')
+      setDebugLogs(prev => [...prev.slice(-99), `[${timestamp}] [${type}] ${message}`])
+    }
+
+    console.log = (...args) => {
+      originalConsoleLog(...args)
+      addLog('LOG', ...args)
+    }
+    console.error = (...args) => {
+      originalConsoleError(...args)
+      addLog('ERROR', ...args)
+    }
+    console.warn = (...args) => {
+      originalConsoleWarn(...args)
+      addLog('WARN', ...args)
+    }
+
+    return () => {
+      console.log = originalConsoleLog
+      console.error = originalConsoleError
+      console.warn = originalConsoleWarn
+    }
+  }, [])
 
   useEffect(() => {
     setFormData(config)
@@ -400,7 +453,7 @@ export function SettingsPage({ config, onSave, onLogout, onLogin }: SettingsPage
             {/* App Info */}
             <div className="text-center py-6">
               <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-primary/30 mb-4">
-                <span className="text-3xl font-bold text-primary">F</span>
+                <Logo size={48} primaryColor="#ffffff" accentColor="hsl(var(--primary))" />
               </div>
               <h2 className="text-2xl font-bold text-foreground">{APP_NAME}</h2>
               <p className="text-muted-foreground mt-1">Version {APP_VERSION}</p>
@@ -413,6 +466,132 @@ export function SettingsPage({ config, onSave, onLogout, onLogin }: SettingsPage
                 Capture, upload, and share instantly with global hotkeys.
               </p>
             </div>
+
+            {/* Updates Section */}
+            <SettingsSection icon={Download} title="Updates" description="Check for new versions">
+              <div className="space-y-3">
+                {updateInfo?.available ? (
+                  <div className="glass-card p-4 border border-primary/30 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                      <span className="text-sm font-medium text-primary">Update Available!</span>
+                    </div>
+                    <p className="text-sm text-foreground">
+                      Version {updateInfo.version} is ready to download
+                    </p>
+                    {updateInfo.notes && (
+                      <p className="text-xs text-muted-foreground line-clamp-3">
+                        {updateInfo.notes}
+                      </p>
+                    )}
+                    {updateInfo.downloading ? (
+                      <div className="space-y-2">
+                        <div className="h-2 bg-secondary/30 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-primary rounded-full transition-all duration-300"
+                            style={{ width: `${updateInfo.progress || 0}%` }}
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground text-center">
+                          Downloading... {updateInfo.progress || 0}%
+                        </p>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={onDownloadUpdate}
+                        className="w-full py-2.5 bg-primary text-primary-foreground rounded-lg font-medium text-sm hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Download size={16} />
+                        Download & Install
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between p-4 rounded-xl bg-secondary/30">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        {checkingForUpdates ? 'Checking...' : 'You\'re up to date!'}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Current version: {APP_VERSION}
+                      </p>
+                    </div>
+                    <button
+                      onClick={onCheckForUpdates}
+                      disabled={checkingForUpdates}
+                      className="px-4 py-2 bg-secondary/50 hover:bg-secondary rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+                    >
+                      <RefreshCw size={14} className={checkingForUpdates ? 'animate-spin' : ''} />
+                      Check
+                    </button>
+                  </div>
+                )}
+              </div>
+            </SettingsSection>
+
+            {/* Debug/Logs Section */}
+            <SettingsSection icon={Bug} title="Debug" description="Logs and diagnostics">
+              <div className="space-y-3">
+                <button
+                  onClick={() => setShowDebugPanel(!showDebugPanel)}
+                  className="w-full flex items-center justify-between p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <Terminal size={18} className="text-muted-foreground" />
+                    <span className="text-sm font-medium text-foreground">Console Logs</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {debugLogs.length} entries
+                  </span>
+                </button>
+
+                {showDebugPanel && (
+                  <div className="glass-card p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Recent logs</span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(debugLogs.join('\n'))
+                          }}
+                          className="p-1.5 hover:bg-secondary rounded transition-colors"
+                          title="Copy logs"
+                        >
+                          <Copy size={14} className="text-muted-foreground" />
+                        </button>
+                        <button
+                          onClick={() => setDebugLogs([])}
+                          className="p-1.5 hover:bg-secondary rounded transition-colors"
+                          title="Clear logs"
+                        >
+                          <Trash2 size={14} className="text-muted-foreground" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="h-48 overflow-auto bg-black/30 rounded-lg p-2 font-mono text-xs">
+                      {debugLogs.length > 0 ? (
+                        debugLogs.map((log, i) => (
+                          <div 
+                            key={i} 
+                            className={`py-0.5 ${
+                              log.includes('[ERROR]') ? 'text-red-400' :
+                              log.includes('[WARN]') ? 'text-yellow-400' :
+                              'text-green-400'
+                            }`}
+                          >
+                            {log}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-muted-foreground/50 text-center py-8">
+                          No logs yet
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </SettingsSection>
 
             {/* Links */}
             <SettingsSection icon={ExternalLink} title="Links" description="Useful resources">

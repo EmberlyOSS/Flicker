@@ -8,21 +8,13 @@
 }
 
 .mobile-menu {
-  max-height: 80vh;
-}
-
-.mobile-action-bar {
-  display: none;
+  transition: max-height 300ms ease, opacity 200ms ease;
 }
 
 /* Tablet and down - show mobile header, hide desktop sidebar */
 @media (max-width: 1024px) {
   .mobile-header {
-    display: block;
-  }
-
-  .mobile-action-bar {
-    display: flex;
+    display: block !important;
   }
 
   .desktop-sidebar {
@@ -31,6 +23,17 @@
 
   body {
     overflow-x: hidden;
+  }
+}
+
+/* Desktop - hide mobile elements */
+@media (min-width: 1025px) {
+  .mobile-header {
+    display: none !important;
+  }
+
+  .mobile-menu {
+    display: none !important;
   }
 }
 

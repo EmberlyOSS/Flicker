@@ -28,7 +28,7 @@ export interface ThemePreset {
 }
 
 export function useTheme() {
-  const [currentTheme, setCurrentTheme] = useState('Default Dark')
+  const [currentTheme, setCurrentTheme] = useState('Stranger Things')
   const [colors, setColors] = useState<ColorConfig>(DEFAULT_COLORS)
 
   // Transform presets to include hex colors for UI previews
@@ -96,6 +96,6 @@ export function useTheme() {
     colors,
     switchTheme,
     updateColor,
-    presets: THEME_PRESETS,
+    presets,
   }
 }

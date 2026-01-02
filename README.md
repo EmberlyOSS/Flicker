@@ -53,9 +53,13 @@ cd Flicker/uploader
 bun install
 # or: npm install
 
-# Run in development mode
-bun run tauri dev
-# or: npm run tauri dev
+## Run vite frontend only
+bun run dev:vite
+# or: npm run dev:vite
+
+# Run in development mode (app and vite frontend)
+bun run dev:tauri
+# or: npm run dev:tauri
 
 # Build for production
 bun run tauri build

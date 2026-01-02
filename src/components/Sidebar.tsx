@@ -1,4 +1,5 @@
-import { Upload, History, Settings, BarChart3, LogOut, Home } from 'lucide-react';
+import { Upload, History, Settings, BarChart3, LogOut } from 'lucide-react';
+import { Logo } from './Logo';
 import '../styles/Sidebar.css';
 
 export interface NavItem {
@@ -31,7 +32,7 @@ export function Sidebar({
       <div className="p-4 border-b border-border/30">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center border border-primary/30">
-            <Home size={20} className="text-primary" />
+            <Logo size={24} primaryColor="#ffffff" accentColor="hsl(var(--primary))" />
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="font-bold text-foreground truncate text-sm">Flicker</h2>

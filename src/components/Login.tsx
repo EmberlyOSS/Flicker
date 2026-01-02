@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { LogIn, Eye, EyeOff, Loader2, AlertCircle, Shield, Sparkles } from 'lucide-react'
+import { LogIn, Eye, EyeOff, Loader2, AlertCircle, Shield } from 'lucide-react'
 import { LoginRequest, LoginResponse } from '../types'
+import { Logo } from './Logo'
 import { API_URL } from '../constants'
 
 interface LoginProps {
@@ -69,11 +70,11 @@ export function Login({ onLogin, onSkip }: LoginProps) {
         {/* Logo Header */}
         <div className="text-center space-y-3">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20">
-            <Sparkles className="w-8 h-8 text-primary" />
+            <Logo size={40} primaryColor="#ffffff" accentColor="hsl(var(--primary))" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">Welcome to Emberly</h1>
+          <h1 className="text-2xl font-bold text-foreground">Welcome to Flicker</h1>
           <p className="text-sm text-muted-foreground">
-            Sign in to your account to start uploading
+            Sign in to your Emberly account to start uploading
           </p>
         </div>
 

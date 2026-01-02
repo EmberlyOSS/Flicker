@@ -94,3 +94,12 @@ export interface SystemInfo {
   temp_dir: string
   screenshots_dir?: string
 }
+
+export interface UploadHistoryItem {
+  url: string
+  name: string
+  timestamp: number
+  fileType?: string
+  size?: number
+  thumbnailUrl?: string
+}
