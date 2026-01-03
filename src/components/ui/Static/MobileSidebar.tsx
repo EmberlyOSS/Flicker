@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Menu, X, Camera, Zap } from 'lucide-react';
 import { NavItem } from './Sidebar';
-import { Logo } from './Logo';
-import { APP_VERSION } from '../constants';
-import '../styles/MobileSidebar.css';
+import { Logo } from '../Logo';
+import { APP_VERSION } from '../../../constants';
+import '../../../styles/MobileSidebar.css';
 
 interface MobileSidebarProps {
   activeNav: string;
@@ -85,10 +85,10 @@ export function MobileSidebar({
             {isLoggedIn && onScreenshot && (
               <button
                 onClick={onScreenshot}
-                className="p-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors shadow-md shadow-primary/20"
+                className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/25 border border-primary/20 hover:shadow-primary/40 hover:scale-105 active:scale-95 transition-all duration-200"
                 aria-label="Take Screenshot"
               >
-                <Camera size={18} />
+                <Camera size={20} className="drop-shadow-sm" />
               </button>
             )}
             {/* Sign In button if not logged in */}

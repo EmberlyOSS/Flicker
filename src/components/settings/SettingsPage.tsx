@@ -1,17 +1,21 @@
-import { useState, useEffect, useCallback } from 'react'
-import { AppConfig, HotkeyConfig } from '../types'
+import { useState, useEffect } from 'react'
+import { AppConfig, HotkeyConfig } from '../../types'
 import { 
-  Save, Eye, EyeOff, User, LogOut, Palette, Cog, Keyboard, 
+  Save, Eye, EyeOff, User, LogOut, Palette, Keyboard, 
   AlertTriangle, Info, Github, Heart, ExternalLink, Check,
   Monitor, Bell, Lock, Upload, Globe, RefreshCw, Download,
-  Terminal, Trash2, Copy, Bug
+  Terminal, Trash2, Copy, Bug, Camera, Volume2, Image, 
+  Clock, FileText, Moon, MousePointer, Loader2
 } from 'lucide-react'
-import { useTheme, ThemePreset } from '../hooks/useTheme'
-import { DEFAULT_HOTKEYS } from '../config'
-import { HotkeyInput } from './HotkeyInput'
-import { Logo } from './Logo'
-import { APP_NAME, APP_VERSION } from '../constants'
-import { UpdateInfo } from '../hooks/useUpdater'
+import { useTheme, ThemePreset } from '../../hooks/useTheme'
+import { DEFAULT_HOTKEYS } from '../../config'
+import { HotkeyInput } from '../HotkeyInput'
+import { Logo } from '../ui/Logo'
+import { APP_NAME, APP_VERSION, API_URL } from '../../constants'
+import { UpdateInfo } from '../../hooks/useUpdater'
+import { invoke } from '@tauri-apps/api/core'
+import { TestUploadModal } from '../upload/TestUploadModal'
+import { UploadResponse } from '../../types'
 
 interface SettingsPageProps {
   config: AppConfig
@@ -23,6 +27,7 @@ interface SettingsPageProps {
   checkingForUpdates?: boolean
   onCheckForUpdates?: () => void
   onDownloadUpdate?: () => void
+  onUpload?: (filePath: string, response: UploadResponse) => void
 }
 
 // Theme preview component with live color swatches
@@ -114,13 +119,19 @@ export function SettingsPage({
   checkingForUpdates,
   onCheckForUpdates,
   onDownloadUpdate,
+  onUpload,
 }: SettingsPageProps) {
   const [formData, setFormData] = useState(config)
   const [showPassword, setShowPassword] = useState(false)
-  const [activeTab, setActiveTab] = useState<'account' | 'upload' | 'hotkeys' | 'appearance' | 'about'>('account')
+  const [activeTab, setActiveTab] = useState<'account' | 'upload' | 'hotkeys' | 'capture' | 'appearance' | 'about' | 'account'>('account')
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [debugLogs, setDebugLogs] = useState<string[]>([])
   const [showDebugPanel, setShowDebugPanel] = useState(false)
+  
+  // Test Connection State
+  const [isTesting, setIsTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{ url: string; name: string; localPath?: string } | null>(null)
+  
   const { currentTheme, switchTheme, presets } = useTheme()
 
   // Capture console logs for debug panel
@@ -172,6 +183,17 @@ export function SettingsPage({
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
+  // Helper for nested config changes
+  const handleNestedChange = (section: keyof AppConfig, field: string, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      [section]: {
+        ...(prev[section] as any || {}),
+        [field]: value
+      }
+    }))
+  }
+
   const handleHotkeyChange = (field: keyof HotkeyConfig, value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -180,6 +202,51 @@ export function SettingsPage({
         [field]: value,
       },
     }))
+  }
+
+  const handleTestConnection = async () => {
+    if (!formData.uploadToken) return
+
+    // Check if we're in a Tauri environment
+    if (!(window as any).__TAURI_INTERNALS__) {
+      alert("Test connection only works in the desktop app, not in a web browser.")
+      return
+    }
+    
+    setIsTesting(true)
+    try {
+      // 1. Get the test image path
+      const imagePath = await invoke<string>('get_test_image_path')
+      
+      // 2. Upload the file
+      const response = await invoke<UploadResponse>('upload_file', {
+        filePath: imagePath,
+        apiUrl: formData.uploadUrl || API_URL,
+        uploadToken: formData.uploadToken,
+        visibility: 'PUBLIC',
+      })
+      
+      setTestResult({
+        url: response.url,
+        name: response.name,
+        localPath: imagePath
+      })
+
+      // Add to history
+      if (onUpload) {
+        onUpload(imagePath, response)
+      }
+    } catch (error) {
+      console.error('Test connection failed:', error)
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      if (errorMsg.includes("reading 'invoke'")) {
+        alert("Connection failed: This feature only works in the desktop application (Tauri).")
+      } else {
+        alert(`Test connection failed: ${errorMsg}`)
+      }
+    } finally {
+      setIsTesting(false)
+    }
   }
 
   const handleSave = () => {
@@ -191,6 +258,7 @@ export function SettingsPage({
     { id: 'account' as const, label: 'Account', icon: User },
     { id: 'upload' as const, label: 'Upload', icon: Upload },
     { id: 'hotkeys' as const, label: 'Hotkeys', icon: Keyboard },
+    { id: 'capture' as const, label: 'Capture', icon: Camera },
     { id: 'appearance' as const, label: 'Appearance', icon: Palette },
     { id: 'about' as const, label: 'About', icon: Info },
   ]
@@ -272,20 +340,40 @@ export function SettingsPage({
             </SettingsSection>
 
             <SettingsSection icon={Lock} title="API Token" description="Your upload authentication token">
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={formData.token || ''}
-                  onChange={(e) => handleChange('token', e.target.value)}
-                  placeholder="Enter your API token"
-                  className="w-full px-4 py-3 pr-12 bg-secondary/50 border border-border/50 rounded-xl text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all font-mono text-sm"
-                />
+              <div className="space-y-3">
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.uploadToken || ''}
+                    onChange={(e) => handleChange('uploadToken', e.target.value)}
+                    placeholder="Enter your API token"
+                    className="w-full px-4 py-3 pr-12 bg-secondary/50 border border-border/50 rounded-xl text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all font-mono text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                
                 <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
+                  onClick={handleTestConnection}
+                  disabled={isTesting || !formData.uploadToken}
+                  className="w-full py-2.5 rounded-xl border border-primary/20 bg-primary/10 text-primary font-medium text-sm hover:bg-primary/20 transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  {isTesting ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Testing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw size={16} />
+                      Test Connection
+                    </>
+                  )}
                 </button>
               </div>
             </SettingsSection>
@@ -296,8 +384,8 @@ export function SettingsPage({
         {activeTab === 'upload' && (
           <div className="space-y-6">
             <SettingsSection icon={Globe} title="Default Visibility" description="Who can see your uploads">
-              <div className="grid grid-cols-3 gap-2">
-                {(['PUBLIC', 'UNLISTED', 'PRIVATE'] as const).map(vis => (
+              <div className="grid grid-cols-2 gap-2">
+                {(['PUBLIC', 'PRIVATE'] as const).map(vis => (
                   <button
                     key={vis}
                     onClick={() => handleChange('visibility', vis)}
@@ -325,6 +413,61 @@ export function SettingsPage({
 
             <SettingsSection icon={Bell} title="Behavior" description="Upload and notification settings">
               <div className="space-y-3">
+                 {/* Post Upload Action */}
+                <div className="p-4 rounded-xl bg-secondary/30 space-y-3">
+                   <label className="text-sm font-medium text-foreground block">After Upload Complete</label>
+                   <div className="flex gap-2">
+                      {(['copy', 'open', 'none'] as const).map(action => (
+                        <button
+                          key={action}
+                          onClick={() => handleNestedChange('behavior', 'postUploadAction', action)}
+                          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            formData.behavior?.postUploadAction === action 
+                              ? 'bg-primary text-primary-foreground' 
+                              : 'bg-background/50 hover:bg-secondary text-muted-foreground'
+                          }`}
+                        >
+                          {action === 'copy' ? 'Copy URL' : action === 'open' ? 'Open URL' : 'Do Nothing'}
+                        </button>
+                      ))}
+                   </div>
+                </div>
+                
+                 {/* Clipboard Format */}
+                <div className="p-4 rounded-xl bg-secondary/30 space-y-3">
+                   <label className="text-sm font-medium text-foreground block">Clipboard Format</label>
+                   <div className="grid grid-cols-2 gap-2">
+                      {(['url', 'raw-url', 'markdown', 'html'] as const).map(format => (
+                        <button
+                          key={format}
+                          onClick={() => handleNestedChange('behavior', 'clipboardFormat', format)}
+                          className={`py-2 rounded-lg text-xs font-medium transition-colors border ${
+                            formData.behavior?.clipboardFormat === format 
+                              ? 'bg-primary/10 text-primary border-primary/20' 
+                              : 'bg-background/50 text-muted-foreground border-transparent hover:bg-secondary'
+                          }`}
+                        >
+                          {format === 'url' ? 'Direct URL' : 
+                           format === 'raw-url' ? 'Raw URL' : 
+                           format.charAt(0).toUpperCase() + format.slice(1)}
+                        </button>
+                      ))}
+                   </div>
+                </div>
+
+                <label className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 cursor-pointer transition-colors">
+                  <div className="flex items-center gap-3">
+                    <Volume2 size={18} className="text-muted-foreground" />
+                    <span className="text-sm font-medium text-foreground">Play Sound on Success</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={formData.behavior?.playSound ?? true}
+                    onChange={(e) => handleNestedChange('behavior', 'playSound', e.target.checked)}
+                    className="w-5 h-5 rounded-lg border-border accent-primary"
+                  />
+                </label>
+
                 <label className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 cursor-pointer transition-colors">
                   <div className="flex items-center gap-3">
                     <Upload size={18} className="text-muted-foreground" />
@@ -405,9 +548,133 @@ export function SettingsPage({
           </div>
         )}
 
+        {/* Capture Tab */}
+        {activeTab === 'capture' && (
+          <div className="space-y-6">
+            <SettingsSection icon={Image} title="Image Settings" description="Format and quality configuration">
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground">File Format</label>
+                    <select
+                      value={formData.capture?.format || 'png'}
+                      onChange={(e) => handleNestedChange('capture', 'format', e.target.value)}
+                      className="w-full px-4 py-3 bg-secondary/50 border border-border/50 rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    >
+                      <option value="png">PNG (Lossless)</option>
+                      <option value="jpg">JPG (Smaller size)</option>
+                    </select>
+                  </div>
+                  
+                  {formData.capture?.format === 'jpg' && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-muted-foreground">Quality ({formData.capture?.quality}%)</label>
+                      <input
+                        type="range"
+                        min="10"
+                        max="100"
+                        value={formData.capture?.quality || 90}
+                        onChange={(e) => handleNestedChange('capture', 'quality', parseInt(e.target.value))}
+                        className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <label className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 cursor-pointer transition-colors">
+                  <div className="flex items-center gap-3">
+                    <Download size={18} className="text-muted-foreground" />
+                    <span className="text-sm font-medium text-foreground">Save Locally</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={formData.capture?.saveLocally ?? false}
+                    onChange={(e) => handleNestedChange('capture', 'saveLocally', e.target.checked)}
+                    className="w-5 h-5 rounded-lg border-border accent-primary"
+                  />
+                </label>
+
+                {/* Advanced Capture Settings */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                   <div 
+                      onClick={(_e) => {
+                         // Simplify toggle logic
+                         const newValue = !(formData.capture?.includeCursor ?? true)
+                         handleNestedChange('capture', 'includeCursor', newValue)
+                      }}
+                      className="p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 cursor-pointer transition-colors flex items-center justify-between"
+                   >
+                     <div className="flex items-center gap-3">
+                       <MousePointer size={18} className="text-muted-foreground" />
+                       <span className="text-sm font-medium text-foreground">Include Cursor</span>
+                     </div>
+                     <div className={`w-10 h-6 rounded-full p-1 transition-colors ${
+                       (formData.capture?.includeCursor ?? true) ? 'bg-primary' : 'bg-muted'
+                     }`}>
+                       <div className={`w-4 h-4 rounded-full bg-white transition-transform ${
+                         (formData.capture?.includeCursor ?? true) ? 'translate-x-4' : ''
+                       }`} />
+                     </div>
+                   </div>
+                </div>
+              </div>
+            </SettingsSection>
+
+            <SettingsSection icon={Clock} title="Timer & Delay" description="Delay before determining capture area">
+               <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Capture Delay (Seconds)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="10"
+                    value={formData.capture?.delay || 0}
+                    onChange={(e) => handleNestedChange('capture', 'delay', parseInt(e.target.value))}
+                    className="w-full px-4 py-3 bg-secondary/50 border border-border/50 rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+               </div>
+            </SettingsSection>
+
+            <SettingsSection icon={FileText} title="Filename Pattern" description="Customize how files are named">
+              <div className="space-y-2">
+                 <input
+                    type="text"
+                    value={formData.capture?.filenamePattern || 'Screenshot_%Y-%m-%d_%H-%M-%S'}
+                    onChange={(e) => handleNestedChange('capture', 'filenamePattern', e.target.value)}
+                    className="w-full px-4 py-3 bg-secondary/50 border border-border/50 rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono text-sm"
+                    placeholder="Screenshot_%Y-%m-%d_%H-%M-%S"
+                  />
+                  <p className="text-xs text-muted-foreground">Available variables: %Y, %m, %d, %H, %M, %S</p>
+              </div>
+            </SettingsSection>
+          </div>
+        )}
+
         {/* Appearance Tab */}
         {activeTab === 'appearance' && (
           <div className="space-y-6">
+             <SettingsSection icon={Moon} title="UI Customization" description="Fine-tune the look and feel">
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground">Font Size</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(['small', 'medium', 'large'] as const).map(scale => (
+                        <button
+                          key={scale}
+                          onClick={() => handleNestedChange('appearance', 'fontScale', scale)}
+                          className={`py-2 rounded-lg text-xs font-medium transition-colors border ${
+                            (formData.appearance?.fontScale || 'medium') === scale
+                              ? 'bg-primary text-primary-foreground border-primary'
+                              : 'bg-secondary/30 text-muted-foreground border-transparent hover:bg-secondary/50'
+                          }`}
+                        >
+                          {scale.charAt(0).toUpperCase() + scale.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+             </SettingsSection>
+
             <SettingsSection icon={Palette} title="Theme" description="Choose your preferred color scheme">
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 {presets.map(preset => (
@@ -678,6 +945,16 @@ export function SettingsPage({
             )}
           </button>
         </div>
+      )}
+      {/* Test Upload Modal */}
+      {testResult && (
+        <TestUploadModal
+          isOpen={!!testResult}
+          onClose={() => setTestResult(null)}
+          imageUrl={testResult.url}
+          imageName={testResult.name}
+          localPath={testResult.localPath}
+        />
       )}
     </div>
   )

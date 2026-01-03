@@ -1,5 +1,6 @@
 export interface AppConfig {
   uploadToken: string
+  uploadUrl?: string
   visibility: 'PUBLIC' | 'PRIVATE'
   password?: string
   autoUpload: boolean
@@ -10,6 +11,41 @@ export interface AppConfig {
   hotkeys?: HotkeyConfig
   // Screenshot settings
   screenshotMode?: ScreenshotMode
+  
+  // -- NEW CUSTOMIZATION --
+  appearance?: AppearanceConfig
+  behavior?: BehaviorConfig
+  capture?: CaptureConfig
+}
+
+export interface AppearanceConfig {
+  theme: string // 'dark', 'light', 'midnight', etc.
+  backgroundOpacity: number // 0.5 to 1.0
+  fontScale: 'small' | 'medium' | 'large'
+  customColors?: {
+    primary: string
+    secondary: string
+    background: string
+  }
+}
+
+export type PostUploadAction = 'copy' | 'open' | 'none'
+export type ClipboardFormat = 'url' | 'raw-url' | 'markdown' | 'html'
+
+export interface BehaviorConfig {
+  postUploadAction: PostUploadAction
+  clipboardFormat: ClipboardFormat
+  playSound: boolean
+  startAtLogin: boolean
+}
+
+export interface CaptureConfig {
+  format: 'png' | 'jpg'
+  quality: number // 1-100 (for jpg)
+  delay: number // seconds
+  filenamePattern: string // e.g. "Screen_{date}_{time}"
+  saveLocally: boolean
+  includeCursor: boolean
 }
 
 export type ScreenshotMode = 'primary' | 'active' | 'all'

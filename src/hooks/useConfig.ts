@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import { AppConfig, loadConfig } from '../config';
+import { AppConfig } from '../types';
+import { loadConfig } from '../config';
+import { useState, useEffect } from 'react'; // Added missing import for useState and useEffect
 
 export function useConfig() {
   const [config, setConfig] = useState<AppConfig | null>(null);

@@ -1,6 +1,7 @@
-import { Upload, History, Settings, BarChart3, LogOut } from 'lucide-react';
-import { Logo } from './Logo';
-import '../styles/Sidebar.css';
+import { Settings, LogOut } from 'lucide-react';
+import { Logo } from '../Logo';
+import { APP_VERSION } from '../../../constants';
+import '../../../styles/Sidebar.css';
 
 export interface NavItem {
   id: string;
@@ -35,7 +36,12 @@ export function Sidebar({
             <Logo size={24} primaryColor="#ffffff" accentColor="hsl(var(--primary))" />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="font-bold text-foreground truncate text-sm">Flicker</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="font-bold text-foreground truncate text-sm">Flicker</h2>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary font-medium">
+                v{APP_VERSION}
+              </span>
+            </div>
             {username && <p className="text-xs text-muted-foreground truncate">{username}</p>}
           </div>
         </div>

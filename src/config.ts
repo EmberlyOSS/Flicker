@@ -13,6 +13,7 @@ export const DEFAULT_HOTKEYS: HotkeyConfig = {
 
 const DEFAULT_CONFIG: AppConfig = {
   uploadToken: '',
+  uploadUrl: 'https://embrly.ca',
   visibility: 'PUBLIC',
   password: undefined,
   autoUpload: true,
@@ -20,6 +21,25 @@ const DEFAULT_CONFIG: AppConfig = {
   user: undefined,
   hotkeys: DEFAULT_HOTKEYS,
   screenshotMode: 'primary',
+  appearance: {
+    theme: 'dark',
+    backgroundOpacity: 0.95,
+    fontScale: 'medium',
+  },
+  behavior: {
+    postUploadAction: 'copy',
+    clipboardFormat: 'url',
+    playSound: true,
+    startAtLogin: false,
+  },
+  capture: {
+    format: 'png',
+    quality: 100,
+    delay: 0,
+    filenamePattern: 'Screenshot_%Y-%m-%d_%H-%M-%S',
+    saveLocally: false,
+    includeCursor: true,
+  },
 }
 
 export function loadConfig(): AppConfig {

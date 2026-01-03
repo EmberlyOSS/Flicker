@@ -1,9 +1,9 @@
 import { useState, useCallback } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
-import { UploadResponse } from '../types'
+import { UploadResponse } from '../../types'
 import { Upload, Copy, Check, AlertCircle, Loader2, FileUp, Link2, X } from 'lucide-react'
-import { API_URL } from '../constants'
+import { API_URL } from '../../constants'
 
 interface UploadAreaProps {
   onUpload: (filePath: string, response: UploadResponse) => void

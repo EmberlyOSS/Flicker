@@ -88,5 +88,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Fixed** - Bug fixes
 - **Security** - Security fixes and improvements
 
-[Unreleased]: https://github.com/EmberlyOSS/Website/compare/flicker-v0.1.0...dev
-[0.1.0-alpha]: https://github.com/EmberlyOSS/Website/releases/tag/flicker-v0.1.0-alpha
+[Unreleased]: https://github.com/EmberlyOSS/Flicker/compare/flicker-v0.1.0...dev
+[0.1.0-alpha]: https://github.com/EmberlyOSS/Flicker/releases/tag/flicker-v0.1.0-alpha

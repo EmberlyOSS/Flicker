@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
-import { AppConfig, HotkeyConfig } from '../types'
+import { AppConfig, HotkeyConfig } from '../../types'
 import { Settings as SettingsIcon, Save, Eye, EyeOff, X, User, LogOut, Palette, Cog, Keyboard, AlertTriangle } from 'lucide-react'
-import { useTheme } from '../hooks/useTheme'
-import { DEFAULT_HOTKEYS } from '../config'
-import { HotkeyInput } from './HotkeyInput'
+import { useTheme } from '../../hooks/useTheme'
+import { DEFAULT_HOTKEYS } from '../../config'
+import { HotkeyInput } from '../HotkeyInput'
 
 interface SettingsProps {
   config: AppConfig

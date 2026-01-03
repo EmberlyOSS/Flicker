@@ -1,22 +1,22 @@
 import { useEffect, useState, useCallback } from "react";
-import { UploadArea } from "./components/UploadArea";
-import { UploadHistory } from "./components/UploadHistory";
-import { SettingsPage } from "./components/SettingsPage";
-import { Login } from "./components/Login";
+import { UploadArea } from "./components/upload/UploadArea";
+import { UploadHistory } from "./components/upload/UploadHistory";
+import { SettingsPage } from "./components/settings/SettingsPage";
+import { Login } from "./components/auth/login/Login";
 import { ScreenshotPreview } from "./components/ScreenshotPreview";
-import { SplashScreen } from "./components/SplashScreen";
+import { SplashScreen } from "./components/shared/SplashScreen";
 import { UpdateNotification } from "./components/UpdateNotification";
-import { Toaster, useToaster } from "./components/Toaster";
-import { Sidebar, NavItem } from "./components/Sidebar";
-import { MobileSidebar } from "./components/MobileSidebar";
-import { PageLayout } from "./components/PageLayout";
+import { Toaster, useToaster } from "./components/ui/Toaster";
+import { Sidebar, NavItem } from "./components/ui/Static/Sidebar";
+import { MobileSidebar } from "./components/ui/Static/MobileSidebar";
+import { PageLayout } from "./components/shared/PageLayout";
 import { loadConfig, saveConfig, loadUploadHistory, saveUploadHistory, addToUploadHistory, DEFAULT_HOTKEYS } from "./config";
 import { AppConfig, UploadResponse, LoginResponse, UploadCompleteEvent, UploadHistoryItem } from "./types";
 import { Upload, History, BarChart3, Camera } from "lucide-react";
 import { useTheme } from "./hooks/useTheme";
 import { useHotkeys } from "./hooks/useHotkeys";
 import { useUpdater } from "./hooks/useUpdater";
-import { APP_NAME, APP_VERSION } from "./constants";
+import { APP_NAME } from "./constants";
 import "./App.css";
 
 function App() {
@@ -28,11 +28,13 @@ function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [updateDismissed, setUpdateDismissed] = useState(false);
 
-  const [activePage, setActivePage] = useState<"upload" | "history" | "settings">("upload");
-  const { currentTheme } = useTheme();
+  const [activePage, setActivePage] = useState<"upload" | "history" | "settings" | "analytics">("upload");
+  
+  // Initialize theme hook
+  useTheme();
   
   // Toast notifications (for non-screenshot errors)
-  const { toasts, removeToast } = useToaster();
+  const { toasts, removeToast, addToast } = useToaster();
   
   // Updater hook
   const { updateInfo, checking, checkForUpdates, downloadAndInstall } = useUpdater();
@@ -45,13 +47,10 @@ function App() {
     addToUploadHistory(result.url, result.name);
     const updatedHistory = loadUploadHistory();
     setHistory(updatedHistory);
-    // Toast handled by native notification in useHotkeys
   }, []);
 
   const handleScreenshotError = useCallback((error: string) => {
     setScreenshotStatus(null);
-    // Error notification handled by native notification in useHotkeys
-    // Only log here for debugging
     console.error('Screenshot error:', error);
   }, []);
 
@@ -64,6 +63,7 @@ function App() {
     hotkeys: config?.hotkeys || DEFAULT_HOTKEYS,
     uploadToken: config?.uploadToken || "",
     visibility: config?.visibility || "PUBLIC",
+    apiUrl: config?.uploadUrl || 'https://embrly.ca',
     enabled: !!config?.uploadToken,
     onScreenshotStart: handleScreenshotStart,
     onUploadComplete: handleScreenshotComplete,
@@ -73,11 +73,9 @@ function App() {
   useEffect(() => {
     try {
       const loadedConfig = loadConfig();
-      console.log('Loaded config:', loadedConfig);
       setConfig(loadedConfig);
       
       const loadedHistory = loadUploadHistory();
-      console.log('Loaded history:', loadedHistory);
       setHistory(loadedHistory);
 
       // Show login if not configured
@@ -97,40 +95,45 @@ function App() {
       setHistory([]);
       setShowLogin(true);
     }
+
+    // Hide splash after 2 seconds
+    const timer = setTimeout(() => {
+      setShowSplash(false);
+    }, 2000);
+
+    return () => clearTimeout(timer);
   }, []);
 
   const handleLogin = (uploadToken: string, user: LoginResponse['user']) => {
-    if (!config || !user) return;
-    
-    const newConfig: AppConfig = {
-      ...config,
-      uploadToken,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        image: user.image,
-        urlId: user.urlId,
-      },
-    };
-    
-    saveConfig(newConfig);
-    setConfig(newConfig);
-    setShowLogin(false);
+    if (uploadToken && user) {
+      const updatedConfig = {
+        ...(config || loadConfig()),
+        uploadToken: uploadToken,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          image: user.image,
+          urlId: user.urlId,
+        },
+      };
+      saveConfig(updatedConfig);
+      setConfig(updatedConfig);
+      setShowLogin(false);
+      addToast(`Logged in as ${user.name || user.email}`, "success");
+    }
   };
 
   const handleLogout = () => {
-    if (!config) return;
-    
-    const newConfig: AppConfig = {
-      ...config,
+    const updatedConfig = {
+      ...(config || loadConfig()),
       uploadToken: '',
       user: undefined,
     };
-    
-    saveConfig(newConfig);
-    setConfig(newConfig);
+    saveConfig(updatedConfig);
+    setConfig(updatedConfig);
     setShowLogin(true);
+    setActivePage('upload');
   };
 
   const handleSaveConfig = (newConfig: AppConfig) => {
@@ -138,14 +141,10 @@ function App() {
     setConfig(newConfig);
   };
 
-  const handleUpload = (_filePath: string, response: UploadResponse) => {
+  const handleUploadComplete = (_filePath: string, response: UploadResponse) => {
     addToUploadHistory(response.url, response.name);
     const updatedHistory = loadUploadHistory();
     setHistory(updatedHistory);
-  };
-
-  const handleCopyUrl = (url: string) => {
-    navigator.clipboard.writeText(url);
   };
 
   const handleDeleteFromHistory = (url: string) => {
@@ -154,38 +153,11 @@ function App() {
     saveUploadHistory(updatedHistory);
   };
 
-  // Show splash screen on startup
-  if (showSplash) {
-    return <SplashScreen onComplete={() => setShowSplash(false)} minDisplayTime={2500} />;
-  }
+  const handleCopyUrl = (url: string) => {
+    navigator.clipboard.writeText(url);
+    // You could add a toast here too
+  };
 
-  if (!config) {
-    return (
-      <div className="min-h-screen gradient-bg flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="relative">
-            <div className="w-16 h-16 border-4 border-primary/30 rounded-full" />
-            <div className="absolute inset-0 w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
-          <p className="text-muted-foreground font-medium">Loading {APP_NAME}...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Show login screen if needed
-  if (showLogin) {
-    return (
-      <Login
-        onLogin={handleLogin}
-        onSkip={() => setShowLogin(false)}
-      />
-    );
-  }
-
-  const isConfigured = !!config.uploadToken;
-
-  // Build navigation items
   const navItems: NavItem[] = [
     {
       id: 'upload',
@@ -199,98 +171,84 @@ function App() {
       badge: history.length > 0 ? history.length : undefined,
     },
     {
-      id: 'analytics',
+      id: 'analytics' as const,
       label: 'Stats',
       icon: <BarChart3 size={20} />,
     },
   ];
 
+  const handleNavChange = (id: "upload" | "history" | "settings" | "analytics") => {
+    setActivePage(id);
+  };
+
+  if (!config) return null;
+
   return (
     <div className="min-h-screen gradient-bg flex flex-col lg:flex-row">
+      {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
+      
+      {showLogin && (
+        <div className="fixed inset-0 z-[100] overflow-auto">
+          <Login
+            onLogin={handleLogin}
+            onSkip={() => setShowLogin(false)}
+          />
+        </div>
+      )}
+
       {/* Desktop Sidebar */}
-      <Sidebar
-        activeNav={activePage}
-        onNavChange={setActivePage}
-        navItems={navItems}
-        username={config?.user?.name || config?.user?.email}
-        onLogout={handleLogout}
-        showLogout={!!config?.uploadToken}
-      />
+      <div className="hidden lg:block">
+        <Sidebar
+          activeNav={activePage}
+          onNavChange={handleNavChange as any}
+          navItems={navItems}
+          username={config?.user?.name || config?.user?.email}
+          onLogout={handleLogout}
+          showLogout={!!config?.uploadToken}
+        />
+      </div>
 
       {/* Mobile Sidebar & Header */}
       <MobileSidebar
         activeNav={activePage}
-        onNavChange={setActivePage}
+        onNavChange={handleNavChange as any}
         navItems={navItems}
         username={config?.user?.name || config?.user?.email}
         onLogout={handleLogout}
         showLogout={!!config?.uploadToken}
+        isLoggedIn={!!config?.uploadToken}
         onScreenshot={takeFullscreenScreenshot}
         onLogin={() => setShowLogin(true)}
-        isLoggedIn={isConfigured}
         uploadCount={history.length}
       />
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col w-full lg:mt-0 pt-[60px] lg:pt-0">
-        {/* Top Header Bar - Desktop Only */}
-        <header className="glass-card border-b border-border/50 p-3 lg:p-4 hidden lg:block">
-          <div className="flex items-center justify-between max-w-7xl mx-auto">
-            {/* Left side - Page info or quick stats */}
-            <div className="flex items-center gap-4">
-              {config?.uploadToken && (
-                <>
-                  <button
-                    onClick={takeFullscreenScreenshot}
-                    className="p-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200 font-medium text-sm flex items-center gap-2 shadow-md shadow-primary/20"
-                    title="Take Screenshot (Ctrl+Shift+S)"
-                  >
-                    <Camera size={18} />
-                    Screenshot
-                  </button>
-                  {/* Quick stats */}
-                  {history.length > 0 && (
-                    <button
-                      onClick={() => setActivePage('history')}
-                      className="px-3 py-2 rounded-lg bg-secondary/50 border border-border/50 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors flex items-center gap-2"
-                    >
-                      <History size={16} />
-                      {history.length} upload{history.length !== 1 ? 's' : ''}
-                    </button>
-                  )}
-                </>
-              )}
-              {/* Show welcome message when not logged in */}
-              {!isConfigured && (
-                <div className="flex items-center gap-3 text-muted-foreground">
-                  <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                  <span className="text-sm">Sign in for a better Emberly Experience</span>
-                </div>
-              )}
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
+        {/* Header (Desktop) */}
+        <header className="hidden lg:flex items-center justify-between px-8 py-4 border-b border-border/30 bg-background/50 backdrop-blur-md sticky top-0 z-10 transition-all duration-300">
+          <div>
+            <h1 className="text-xl font-bold text-foreground">{APP_NAME}</h1>
+            <p className="text-xs text-muted-foreground">Emberly Alpha Tools</p>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary/50 rounded-full border border-border/50">
+              <div className={`w-2 h-2 rounded-full ${config.uploadToken ? 'bg-green-500' : 'bg-destructive'} animate-pulse`} />
+              <span className="text-xs font-medium text-muted-foreground lowercase">
+                {config.uploadToken ? 'Connected' : 'Disconnected'}
+              </span>
             </div>
-            {/* Right side - User actions */}
-            <div className="flex items-center gap-3">
-              {isConfigured && config?.user && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary/30 border border-border/30">
-                  {config.user.image ? (
-                    <img 
-                      src={config.user.image} 
-                      alt="" 
-                      className="w-6 h-6 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
-                      <span className="text-xs font-medium text-primary">
-                        {(config.user.name || config.user.email)?.[0]?.toUpperCase()}
-                      </span>
-                    </div>
-                  )}
-                  <span className="text-sm text-foreground font-medium max-w-[120px] truncate">
-                    {config.user.name || config.user.email}
-                  </span>
-                </div>
-              )}
-              {!isConfigured && (
+            
+            <div className="flex items-center gap-2">
+              {config.uploadToken ? (
+                <button
+                  onClick={takeFullscreenScreenshot}
+                  className="px-5 py-2.5 bg-gradient-to-br from-primary to-primary/80 text-primary-foreground rounded-xl font-medium shadow-lg shadow-primary/25 border border-primary/20 hover:shadow-primary/40 hover:scale-[1.02] active:scale-95 transition-all duration-200 flex items-center gap-2.5 group"
+                >
+                  <Camera size={20} className="group-hover:rotate-[15deg] transition-transform duration-300 drop-shadow-sm" />
+                  <span>Capture</span>
+                </button>
+              ) : (
                 <button
                   onClick={() => setShowLogin(true)}
                   className="text-sm bg-primary text-primary-foreground px-4 py-2 rounded-lg font-medium hover:bg-primary/90 transition-colors shadow-md shadow-primary/20"
@@ -306,16 +264,15 @@ function App() {
         <main className="flex-1 overflow-auto p-3 lg:p-6 lg:mt-0">
           <div className="max-w-4xl lg:max-w-6xl mx-auto">
             {activePage === 'upload' && (
-              <PageLayout
-                title="Upload Files"
-                description="Drag and drop files or click to select"
-              >
-                <UploadArea
-                  onUpload={handleUpload}
-                  uploadToken={config?.uploadToken || ''}
-                  visibility={config?.visibility || 'PUBLIC'}
-                  password={config?.password}
-                />
+              <PageLayout title="Upload" description="Share files and screenshots">
+                {config && (
+                  <UploadArea
+                    onUpload={handleUploadComplete}
+                    uploadToken={config.uploadToken}
+                    visibility={config.visibility}
+                    password={config.password}
+                  />
+                )}
               </PageLayout>
             )}
 
@@ -339,10 +296,22 @@ function App() {
               </PageLayout>
             )}
 
+            {activePage === 'analytics' && (
+              <PageLayout title="Analytics" description="Upload statistics">
+                <div className="glass-card p-12 text-center">
+                  <BarChart3 size={48} className="mx-auto text-primary/30 mb-4" />
+                  <h3 className="text-xl font-bold text-foreground">Coming Soon</h3>
+                  <p className="text-muted-foreground max-w-sm mx-auto mt-2">
+                    Detailed analytics and upload stats are currently under development.
+                  </p>
+                </div>
+              </PageLayout>
+            )}
+
             {activePage === 'settings' && (
               <PageLayout title="Settings" description="Manage your preferences">
                 <SettingsPage
-                  config={config || { uploadToken: '', visibility: 'PUBLIC' }}
+                  config={config}
                   onSave={handleSaveConfig}
                   onLogout={handleLogout}
                   onLogin={() => setShowLogin(true)}
@@ -350,16 +319,8 @@ function App() {
                   checkingForUpdates={checking}
                   onCheckForUpdates={checkForUpdates}
                   onDownloadUpdate={downloadAndInstall}
+                  onUpload={handleUploadComplete}
                 />
-              </PageLayout>
-            )}
-
-            {activePage === 'analytics' && (
-              <PageLayout title="Upload Statistics" description="Your upload metrics">
-                <div className="glass-card p-8 text-center">
-                  <BarChart3 size={32} className="mx-auto text-muted-foreground/50 mb-2" />
-                  <p className="text-muted-foreground">Analytics coming soon</p>
-                </div>
               </PageLayout>
             )}
           </div>

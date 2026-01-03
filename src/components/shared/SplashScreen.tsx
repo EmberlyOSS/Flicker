@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { Download, RefreshCw } from 'lucide-react'
 import { check } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
-import { Logo } from './Logo'
-import { APP_NAME, APP_VERSION } from '../constants'
+import { Logo } from '../ui/Logo'
+import { APP_NAME, APP_VERSION } from '../../constants'
 
 // Fun facts, tips, and easter eggs
 const LOADING_FACTS = [

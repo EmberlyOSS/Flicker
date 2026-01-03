@@ -8,18 +8,44 @@ import {
   sendNotification,
 } from '@tauri-apps/plugin-notification';
 import { useConfig } from './useConfig';
-import { UploadResponse } from '../types';
+import { UploadCompleteEvent, HotkeyConfig } from '../types';
 
-export function useHotkeys() {
+interface UseHotkeysOptions {
+  hotkeys?: HotkeyConfig;
+  uploadToken?: string;
+  visibility?: string;
+  apiUrl?: string;
+  enabled?: boolean;
+  onScreenshotStart?: () => void;
+  onUploadComplete?: (result: UploadCompleteEvent) => void;
+  onError?: (error: string) => void;
+}
+
+export function useHotkeys(options?: UseHotkeysOptions) {
   const { config, isLoading } = useConfig();
   const isCapturingRef = useRef(false);
   const registeredHotkeysRef = useRef<string[]>([]);
-  const configRef = useRef(config);
+  
+  // Create a base config that defaults to hook values
+  const getBaseConfig = useCallback((): UseHotkeysOptions => {
+    return {
+      hotkeys: options?.hotkeys || config?.hotkeys,
+      uploadToken: options?.uploadToken || config?.uploadToken,
+      visibility: options?.visibility || config?.visibility || 'PUBLIC',
+      apiUrl: options?.apiUrl || config?.uploadUrl || 'https://embrly.ca',
+      enabled: options?.enabled ?? !!config?.uploadToken,
+      onScreenshotStart: options?.onScreenshotStart,
+      onUploadComplete: options?.onUploadComplete,
+      onError: options?.onError
+    };
+  }, [config, options]);
 
+  const configRef = useRef(getBaseConfig());
+  
   // Keep config ref updated
   useEffect(() => {
-    configRef.current = config;
-  }, [config]);
+    configRef.current = getBaseConfig();
+  }, [getBaseConfig]);
 
   // Format bytes helper
   const formatBytes = (bytes: number): string => {
@@ -31,7 +57,7 @@ export function useHotkeys() {
   };
 
   // Send notification helper
-  const sendUploadNotification = useCallback(async (success: boolean, message: string, url?: string) => {
+  const sendUploadNotification = useCallback(async (success: boolean, message: string) => {
     try {
       let permissionGranted = await isPermissionGranted();
       if (!permissionGranted) {
@@ -58,25 +84,31 @@ export function useHotkeys() {
     }
 
     const currentConfig = configRef.current;
-    if (!currentConfig?.apiKey || !currentConfig?.uploadUrl) {
-      console.error('API key or upload URL not configured');
-      await sendUploadNotification(false, 'Please configure your API key and upload URL in settings');
+    if (!currentConfig.uploadToken || !currentConfig.apiUrl) {
+      console.error('API token or API URL not configured');
+      await sendUploadNotification(false, 'Please sign in or configure your API settings');
       return;
+    }
+
+    if (currentConfig.onScreenshotStart) {
+      currentConfig.onScreenshotStart();
     }
 
     isCapturingRef.current = true;
     console.log(`Taking ${captureAll ? 'all monitors' : 'fullscreen'} screenshot...`);
 
     try {
-      const result = await invoke<UploadResponse>('screenshot_and_upload', {
-        apiKey: currentConfig.apiKey,
-        uploadUrl: currentConfig.uploadUrl,
+      const result = await invoke<UploadCompleteEvent>('screenshot_and_upload', {
+        uploadToken: currentConfig.uploadToken,
+        apiUrl: currentConfig.apiUrl,
+        visibility: currentConfig.visibility || 'PUBLIC',
         captureAll: captureAll,
+        monitorIndex: null,
       });
 
       console.log('Screenshot result:', result);
 
-      if (result.success && result.url) {
+      if (result.url) {
         // Copy URL to clipboard
         try {
           await writeText(result.url);
@@ -85,17 +117,27 @@ export function useHotkeys() {
           console.error('Failed to copy to clipboard:', clipboardError);
         }
 
+        if (currentConfig.onUploadComplete) {
+          currentConfig.onUploadComplete(result);
+        }
+
         // Format file size if available
         const sizeInfo = result.size ? ` (${formatBytes(result.size)})` : '';
-        await sendUploadNotification(true, `URL copied to clipboard${sizeInfo}\n${result.url}`, result.url);
+        await sendUploadNotification(true, `URL copied to clipboard${sizeInfo}\n${result.url}`);
       } else {
-        const errorMessage = result.error || 'Unknown error occurred';
+        const errorMessage = 'Unknown upload error occurred';
         console.error('Upload failed:', errorMessage);
+        if (currentConfig.onError) {
+          currentConfig.onError(errorMessage);
+        }
         await sendUploadNotification(false, errorMessage);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('Screenshot error:', errorMessage);
+      if (currentConfig.onError) {
+        currentConfig.onError(errorMessage);
+      }
       await sendUploadNotification(false, errorMessage);
     } finally {
       isCapturingRef.current = false;
@@ -109,6 +151,8 @@ export function useHotkeys() {
   // Register hotkeys
   useEffect(() => {
     if (isLoading || !config) return;
+
+    const currentConfig = configRef.current;
 
     const registerHotkeys = async () => {
       // Unregister any previously registered hotkeys
@@ -126,8 +170,8 @@ export function useHotkeys() {
       registeredHotkeysRef.current = [];
 
       // Register fullscreen screenshot hotkey
-      if (config.hotkeys?.screenshotFullscreen) {
-        const hotkey = config.hotkeys.screenshotFullscreen;
+      if (currentConfig.hotkeys?.screenshotFullscreen) {
+        const hotkey = currentConfig.hotkeys.screenshotFullscreen;
         try {
           const alreadyRegistered = await isRegistered(hotkey);
           if (!alreadyRegistered) {
@@ -146,8 +190,8 @@ export function useHotkeys() {
       }
 
       // Register all monitors screenshot hotkey
-      if (config.hotkeys?.screenshotAllMonitors) {
-        const hotkey = config.hotkeys.screenshotAllMonitors;
+      if (currentConfig.hotkeys?.screenshotAllMonitors) {
+        const hotkey = currentConfig.hotkeys.screenshotAllMonitors;
         try {
           const alreadyRegistered = await isRegistered(hotkey);
           if (!alreadyRegistered) {
@@ -186,7 +230,7 @@ export function useHotkeys() {
       };
       cleanup();
     };
-  }, [isLoading, config?.hotkeys?.screenshotFullscreen, config?.hotkeys?.screenshotAllMonitors, takeFullscreenScreenshot, takeAllMonitorsScreenshot]);
+  }, [isLoading, config, takeFullscreenScreenshot, takeAllMonitorsScreenshot]);
 
   return {
     takeFullscreenScreenshot,
