@@ -48,13 +48,12 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: 'emberly-app/src-tauri -> target'
+          workspaces: 'src-tauri -> target'
 
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
 
       - name: Install frontend dependencies
-        working-directory: emberly-app
         run: bun install
 
       - name: Build and release
@@ -66,7 +65,6 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          projectPath: emberly-app
           tagName: flicker-v__VERSION__
           releaseName: 'Flicker v__VERSION__'
           releaseDraft: true
