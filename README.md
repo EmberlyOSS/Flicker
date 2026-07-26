@@ -147,7 +147,7 @@ Please read the [Code of Conduct](CODE_OF_CONDUCT.md) before participating in th
 
 ## License
 
-Licensed under the MIT License. See [LICENSE](LICENSE) for details.
+Licensed under the GNU Affero General Public License v3.0. See [LICENSE](LICENSE) for details.
 
 ## Links
 
