@@ -142,6 +142,7 @@ Please read the [Code of Conduct](CODE_OF_CONDUCT.md) before participating in th
 
 - Bug reports: [open an issue](https://github.com/EmberlyOSS/Flicker/issues/new?template=bug_report.md)
 - Feature requests: [open an issue](https://github.com/EmberlyOSS/Flicker/issues/new?template=feature_request.md)
+- Beta testing feedback: [open an issue](https://github.com/EmberlyOSS/Flicker/issues/new?template=beta_feedback.md)
 - Questions: [Discord](https://embrly.ca/discord)
 
 ## License
