@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { DEFAULT_COLORS, THEME_PRESETS, type ColorConfig, hslToHex } from '../colors'
 
 const THEME_STORAGE_KEY = 'emberly-uploader-theme'
@@ -17,6 +17,47 @@ function hslStringToHex(hslString: string): string {
   return '#000000'
 }
 
+/**
+ * Apply CSS variables to :root
+ */
+function applyColors(colorConfig: ColorConfig) {
+  Object.entries(colorConfig).forEach(([key, value]) => {
+    const cssKey = key.replace(/([A-Z])/g, '-$1').toLowerCase()
+    document.documentElement.style.setProperty(`--${cssKey}`, value)
+  })
+}
+
+/**
+ * Get the saved theme name from localStorage
+ */
+function getSavedThemeName(): string {
+  if (typeof window === 'undefined') return 'Stranger Things'
+  try {
+    return localStorage.getItem(THEME_STORAGE_KEY) || 'Stranger Things'
+  } catch {
+    return 'Stranger Things'
+  }
+}
+
+/**
+ * Get colors for a theme name
+ */
+function getThemeColors(themeName: string): ColorConfig {
+  const preset = THEME_PRESETS.find((p) => p.name === themeName)
+  return preset?.colors || DEFAULT_COLORS
+}
+
+// ============================================================================
+// SYNCHRONOUS THEME INITIALIZATION - runs before React renders
+// ============================================================================
+const initialThemeName = getSavedThemeName()
+const initialColors = getThemeColors(initialThemeName)
+
+// Apply theme immediately (this runs at module load time)
+if (typeof document !== 'undefined') {
+  applyColors(initialColors)
+}
+
 export interface ThemePreset {
   name: string
   label: string
@@ -28,11 +69,12 @@ export interface ThemePreset {
 }
 
 export function useTheme() {
-  const [currentTheme, setCurrentTheme] = useState('Stranger Things')
-  const [colors, setColors] = useState<ColorConfig>(DEFAULT_COLORS)
+  // Initialize with the already-applied theme (no flash!)
+  const [currentTheme, setCurrentTheme] = useState(initialThemeName)
+  const [colors, setColors] = useState<ColorConfig>(initialColors)
 
   // Transform presets to include hex colors for UI previews
-  const presets: ThemePreset[] = useMemo(() => 
+  const presets: ThemePreset[] = useMemo(() =>
     THEME_PRESETS.map(preset => ({
       name: preset.name,
       label: preset.name,
@@ -42,32 +84,7 @@ export function useTheme() {
       background: hslStringToHex(preset.colors.background),
       colors: preset.colors,
     })),
-  [])
-
-  // Load theme from localStorage on mount
-  useEffect(() => {
-    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY)
-    if (savedTheme) {
-      const preset = THEME_PRESETS.find((p) => p.name === savedTheme)
-      if (preset) {
-        setCurrentTheme(preset.name)
-        applyColors(preset.colors)
-        setColors(preset.colors)
-      }
-    } else {
-      applyColors(DEFAULT_COLORS)
-    }
-  }, [])
-
-  /**
-   * Apply CSS variables to :root
-   */
-  function applyColors(colorConfig: ColorConfig) {
-    Object.entries(colorConfig).forEach(([key, value]) => {
-      const cssKey = key.replace(/([A-Z])/g, '-$1').toLowerCase()
-      document.documentElement.style.setProperty(`--${cssKey}`, value)
-    })
-  }
+    [])
 
   /**
    * Switch to a different theme preset

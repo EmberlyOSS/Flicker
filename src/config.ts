@@ -7,7 +7,7 @@ export const DEFAULT_HOTKEYS: HotkeyConfig = {
   screenshotFullscreen: 'Control+Shift+S',
   screenshotRegion: '',
   screenshotAllMonitors: 'Control+Shift+A',
-  uploadClipboard: '',
+  uploadClipboard: 'Control+Alt+U',
   openApp: '',
 }
 
@@ -25,6 +25,12 @@ const DEFAULT_CONFIG: AppConfig = {
     theme: 'dark',
     backgroundOpacity: 0.95,
     fontScale: 'medium',
+    fontFamily: 'system',
+    borderRadius: 'medium',
+    sidebarPosition: 'left',
+    compactMode: false,
+    animations: true,
+    glassEffect: true,
   },
   behavior: {
     postUploadAction: 'copy',

@@ -1,16 +1,27 @@
 import { useState, useMemo } from 'react'
-import { 
-  Copy, Trash2, ExternalLink, History, Check, Clock, File, 
+import {
+  Copy, Trash2, ExternalLink, History, Check, Clock, File,
   Image, Video, Music, FileText, ChevronLeft, ChevronRight,
   Grid3x3, LayoutList, Eye, X, Download, Search, Calendar,
-  ArrowUpDown, Filter, SortAsc, SortDesc
+  ArrowUpDown, SortAsc, SortDesc, CheckSquare, Square
 } from 'lucide-react'
-import { UploadHistoryItem } from '../../types'
+import { writeText } from '@tauri-apps/plugin-clipboard-manager'
+import { ClipboardFormat, UploadHistoryItem } from '../../types'
+import { formatForClipboard } from '../../utils/clipboardFormat'
 
 interface UploadHistoryProps {
   history: UploadHistoryItem[]
   onCopy?: (url: string) => void
   onDelete?: (url: string) => void
+  clipboardFormat?: ClipboardFormat
+}
+
+async function copyToClipboard(text: string): Promise<void> {
+  try {
+    await writeText(text)
+  } catch {
+    navigator.clipboard.writeText(text)
+  }
 }
 
 const ITEMS_PER_PAGE = 12
@@ -70,23 +81,25 @@ function formatTime(timestamp: number): string {
 }
 
 // Preview Modal Component
-function PreviewModal({ 
-  item, 
+function PreviewModal({
+  item,
   onClose,
   onCopy,
-  onDelete
-}: { 
+  onDelete,
+  clipboardFormat,
+}: {
   item: UploadHistoryItem
   onClose: () => void
   onCopy?: (url: string) => void
   onDelete?: (url: string) => void
+  clipboardFormat?: ClipboardFormat
 }) {
   const [copied, setCopied] = useState(false)
   const category = getFileCategory(item)
   const previewUrl = getPreviewUrl(item.url)
-  
+
   const handleCopy = () => {
-    navigator.clipboard.writeText(item.url)
+    copyToClipboard(formatForClipboard(item.url, item.name, clipboardFormat))
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
     onCopy?.(item.url)
@@ -298,7 +311,7 @@ function Thumbnail({ item, onClick }: { item: UploadHistoryItem; onClick: () => 
   )
 }
 
-export function UploadHistory({ history, onCopy, onDelete }: UploadHistoryProps) {
+export function UploadHistory({ history, onCopy, onDelete, clipboardFormat }: UploadHistoryProps) {
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
@@ -307,6 +320,8 @@ export function UploadHistory({ history, onCopy, onDelete }: UploadHistoryProps)
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState<SortOption>('newest')
   const [showFilters, setShowFilters] = useState(false)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
 
   // Filter and search history
   const filteredHistory = useMemo(() => {
@@ -359,11 +374,11 @@ export function UploadHistory({ history, onCopy, onDelete }: UploadHistoryProps)
     return filteredHistory.slice(start, start + ITEMS_PER_PAGE)
   }, [filteredHistory, currentPage])
 
-  const handleCopy = (url: string) => {
-    navigator.clipboard.writeText(url)
-    setCopiedUrl(url)
+  const handleCopy = (item: UploadHistoryItem) => {
+    copyToClipboard(formatForClipboard(item.url, item.name, clipboardFormat))
+    setCopiedUrl(item.url)
     setTimeout(() => setCopiedUrl(null), 2000)
-    onCopy?.(url)
+    onCopy?.(item.url)
   }
 
   // Reset page when filter/search changes
@@ -380,6 +395,33 @@ export function UploadHistory({ history, onCopy, onDelete }: UploadHistoryProps)
   const handleSortChange = (newSort: SortOption) => {
     setSortBy(newSort)
     setCurrentPage(1)
+  }
+
+  const toggleSelectMode = () => {
+    setSelectMode(prev => !prev)
+    setSelected(new Set())
+  }
+
+  const toggleSelected = (url: string) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(url)) next.delete(url)
+      else next.add(url)
+      return next
+    })
+  }
+
+  const handleBulkCopy = async () => {
+    const items = history.filter(item => selected.has(item.url))
+    const text = items.map(item => formatForClipboard(item.url, item.name, clipboardFormat)).join('\n')
+    await copyToClipboard(text)
+    items.forEach(item => onCopy?.(item.url))
+  }
+
+  const handleBulkDelete = () => {
+    selected.forEach(url => onDelete?.(url))
+    setSelected(new Set())
+    setSelectMode(false)
   }
 
   // Get count by category
@@ -514,9 +556,49 @@ export function UploadHistory({ history, onCopy, onDelete }: UploadHistoryProps)
                 <LayoutList className="w-4 h-4" />
               </button>
             </div>
+
+            {/* Select Mode Toggle */}
+            <button
+              onClick={toggleSelectMode}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                selectMode
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-secondary/30 hover:bg-secondary/50 text-foreground border-border/30'
+              }`}
+            >
+              {selectMode ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline">Select</span>
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Bulk Action Bar */}
+      {selectMode && selected.size > 0 && (
+        <div className="glass-card p-3 flex items-center justify-between gap-3 border border-primary/30 animate-slide-up">
+          <span className="text-sm font-medium text-foreground pl-1">
+            {selected.size} selected
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={handleBulkCopy}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-secondary/50 hover:bg-secondary text-foreground transition-all border border-border/30"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              Copy All
+            </button>
+            {onDelete && (
+              <button
+                onClick={handleBulkDelete}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-destructive/10 hover:bg-destructive/20 text-destructive transition-all border border-destructive/20"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Delete
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Grid View */}
       {viewMode === 'grid' && (
@@ -524,10 +606,27 @@ export function UploadHistory({ history, onCopy, onDelete }: UploadHistoryProps)
           {paginatedHistory.map((item, idx) => (
             <div
               key={`${item.url}-${idx}`}
-              className="glass-card overflow-hidden group animate-fade-in border border-border/30 hover:border-primary/30 transition-all duration-200"
+              className={`glass-card overflow-hidden group animate-fade-in border transition-all duration-200 relative ${
+                selected.has(item.url) ? 'border-primary/60' : 'border-border/30 hover:border-primary/30'
+              }`}
               style={{ animationDelay: `${idx * 30}ms` }}
             >
-              <Thumbnail item={item} onClick={() => setPreviewItem(item)} />
+              {selectMode && (
+                <button
+                  onClick={() => toggleSelected(item.url)}
+                  className="absolute top-2 left-2 z-10 p-1 rounded-md bg-black/50 backdrop-blur-sm"
+                >
+                  {selected.has(item.url) ? (
+                    <CheckSquare className="w-4 h-4 text-primary" />
+                  ) : (
+                    <Square className="w-4 h-4 text-white" />
+                  )}
+                </button>
+              )}
+              <Thumbnail
+                item={item}
+                onClick={() => (selectMode ? toggleSelected(item.url) : setPreviewItem(item))}
+              />
               <div className="p-3 space-y-2">
                 <p className="text-sm font-medium text-foreground truncate" title={item.name}>
                   {item.name}
@@ -536,7 +635,7 @@ export function UploadHistory({ history, onCopy, onDelete }: UploadHistoryProps)
                   <span className="text-xs text-muted-foreground flex-shrink-0">{formatTime(item.timestamp)}</span>
                   <div className="flex gap-1 flex-shrink-0">
                     <button
-                      onClick={() => handleCopy(item.url)}
+                      onClick={() => handleCopy(item)}
                       title="Copy URL"
                       className={`p-1.5 rounded transition-all flex items-center justify-center ${
                         copiedUrl === item.url
@@ -582,12 +681,26 @@ export function UploadHistory({ history, onCopy, onDelete }: UploadHistoryProps)
             return (
               <div
                 key={`${item.url}-${idx}`}
-                className="glass-card p-3 group animate-fade-in flex items-center gap-3 border border-border/30 hover:border-primary/30 transition-all duration-200"
+                className={`glass-card p-3 group animate-fade-in flex items-center gap-3 border transition-all duration-200 ${
+                  selected.has(item.url) ? 'border-primary/60' : 'border-border/30 hover:border-primary/30'
+                }`}
                 style={{ animationDelay: `${idx * 30}ms` }}
               >
+                {selectMode && (
+                  <button
+                    onClick={() => toggleSelected(item.url)}
+                    className="p-1 flex-shrink-0"
+                  >
+                    {selected.has(item.url) ? (
+                      <CheckSquare className="w-5 h-5 text-primary" />
+                    ) : (
+                      <Square className="w-5 h-5 text-muted-foreground" />
+                    )}
+                  </button>
+                )}
                 {/* Thumbnail */}
-                <button 
-                  onClick={() => setPreviewItem(item)}
+                <button
+                  onClick={() => (selectMode ? toggleSelected(item.url) : setPreviewItem(item))}
                   className="relative w-16 h-16 rounded-lg overflow-hidden bg-secondary/30 flex-shrink-0 border border-border/30 hover:border-primary/30 transition-all"
                 >
                   {category === 'image' ? (
@@ -617,7 +730,7 @@ export function UploadHistory({ history, onCopy, onDelete }: UploadHistoryProps)
                 {/* Actions */}
                 <div className="flex gap-1">
                   <button
-                    onClick={() => handleCopy(item.url)}
+                    onClick={() => handleCopy(item)}
                     title="Copy URL"
                     className={`p-2 rounded-lg transition-all duration-200 border flex items-center justify-center ${
                       copiedUrl === item.url
@@ -719,11 +832,12 @@ export function UploadHistory({ history, onCopy, onDelete }: UploadHistoryProps)
 
       {/* Preview Modal */}
       {previewItem && (
-        <PreviewModal 
-          item={previewItem} 
+        <PreviewModal
+          item={previewItem}
           onClose={() => setPreviewItem(null)}
           onCopy={onCopy}
           onDelete={onDelete}
+          clipboardFormat={clipboardFormat}
         />
       )}
     </div>

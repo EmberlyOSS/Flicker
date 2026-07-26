@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react'
 import { AppConfig, HotkeyConfig } from '../../types'
-import { 
-  Save, Eye, EyeOff, User, LogOut, Palette, Keyboard, 
-  AlertTriangle, Info, Github, Heart, ExternalLink, Check,
-  Monitor, Bell, Lock, Upload, Globe, RefreshCw, Download,
-  Terminal, Trash2, Copy, Bug, Camera, Volume2, Image, 
-  Clock, FileText, Moon, MousePointer, Loader2
+import {
+  Save, Eye, EyeOff, User, LogOut, Palette, Keyboard,
+  Bug, Info, Github, Heart, ExternalLink, Check,
+  Camera, Volume2, Image, FileText, Moon, MousePointer, Loader2, Shield, Zap,
+  Copy, RefreshCw, Globe, Download, ChevronDown, Monitor, Trash2
 } from 'lucide-react'
 import { useTheme, ThemePreset } from '../../hooks/useTheme'
 import { DEFAULT_HOTKEYS } from '../../config'
@@ -16,6 +15,9 @@ import { UpdateInfo } from '../../hooks/useUpdater'
 import { invoke } from '@tauri-apps/api/core'
 import { TestUploadModal } from '../upload/TestUploadModal'
 import { UploadResponse } from '../../types'
+import { useSounds } from '../../hooks/useSounds'
+import { saveAppearance } from '../../hooks/useAppearance'
+import { AuditLogPanel, DeviceInfoPanel } from '../debug'
 
 interface SettingsPageProps {
   config: AppConfig
@@ -31,73 +33,72 @@ interface SettingsPageProps {
 }
 
 // Theme preview component with live color swatches
-function ThemePreviewCard({ 
-  preset, 
-  isActive, 
-  onClick 
-}: { 
+function ThemePreviewCard({
+  preset,
+  isActive,
+  onClick
+}: {
   preset: ThemePreset
   isActive: boolean
-  onClick: () => void 
+  onClick: () => void
 }) {
   return (
     <button
       onClick={onClick}
-      className={`group relative p-4 rounded-xl border-2 transition-all duration-300 text-left overflow-hidden ${
-        isActive
-          ? 'border-primary bg-primary/10 shadow-lg shadow-primary/20'
-          : 'border-border/50 hover:border-primary/40 hover:bg-secondary/30'
-      }`}
+      className={`group relative p-4 rounded-xl border-2 transition-all duration-300 text-left overflow-hidden ${isActive
+        ? 'border-primary bg-primary/10 shadow-lg shadow-primary/20'
+        : 'border-border/50 hover:border-primary/40 hover:bg-secondary/30'
+        }`}
     >
       {/* Selection indicator */}
       {isActive && (
-        <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+        <div className="absolute flex items-center justify-center w-5 h-5 rounded-full top-2 right-2 bg-primary">
           <Check size={12} className="text-primary-foreground" />
         </div>
       )}
-      
+
       {/* Color swatches */}
       <div className="flex gap-1.5 mb-3">
-        <div 
-          className="w-6 h-6 rounded-full border border-white/20 shadow-sm"
+        <div
+          className="w-6 h-6 border rounded-full shadow-sm border-white/20"
           style={{ backgroundColor: preset.primary }}
           title="Primary"
         />
-        <div 
-          className="w-6 h-6 rounded-full border border-white/20 shadow-sm"
+        <div
+          className="w-6 h-6 border rounded-full shadow-sm border-white/20"
           style={{ backgroundColor: preset.secondary }}
           title="Secondary"
         />
-        <div 
-          className="w-6 h-6 rounded-full border border-white/20 shadow-sm"
+        <div
+          className="w-6 h-6 border rounded-full shadow-sm border-white/20"
           style={{ backgroundColor: preset.background }}
           title="Background"
         />
       </div>
-      
+
       {/* Theme name */}
-      <p className="font-medium text-sm text-foreground truncate">{preset.label}</p>
+      <p className="text-sm font-medium truncate text-foreground">{preset.label}</p>
       <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{preset.description}</p>
     </button>
   )
 }
 
 // Settings section wrapper
-function SettingsSection({ 
-  icon: Icon, 
-  title, 
-  description, 
-  children 
-}: { 
+function SettingsSection({
+  icon: Icon,
+  title,
+  description,
+  children
+}: {
   icon: React.ElementType
   title: string
   description?: string
-  children: React.ReactNode 
+  children: React.ReactNode
 }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
+        <div className="flex items-center justify-center w-10 h-10 border rounded-xl bg-primary/10 border-primary/20">
           <Icon size={20} className="text-primary" />
         </div>
         <div>
@@ -110,10 +111,10 @@ function SettingsSection({
   )
 }
 
-export function SettingsPage({ 
-  config, 
-  onSave, 
-  onLogout, 
+export function SettingsPage({
+  config,
+  onSave,
+  onLogout,
   onLogin,
   updateInfo,
   checkingForUpdates,
@@ -123,16 +124,16 @@ export function SettingsPage({
 }: SettingsPageProps) {
   const [formData, setFormData] = useState(config)
   const [showPassword, setShowPassword] = useState(false)
-  const [activeTab, setActiveTab] = useState<'account' | 'upload' | 'hotkeys' | 'capture' | 'appearance' | 'about' | 'account'>('account')
+  const [activeTab, setActiveTab] = useState<'account' | 'capture' | 'hotkeys' | 'preferences' | 'application'>('account')
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [debugLogs, setDebugLogs] = useState<string[]>([])
-  const [showDebugPanel, setShowDebugPanel] = useState(false)
-  
+
   // Test Connection State
   const [isTesting, setIsTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ url: string; name: string; localPath?: string } | null>(null)
-  
+
   const { currentTheme, switchTheme, presets } = useTheme()
+  const { preferences: soundPrefs, savePreferences, playUploadSuccess, playUploadError, playCopyLink, playSettingsSave, loaded: soundsLoaded } = useSounds()
 
   // Capture console logs for debug panel
   useEffect(() => {
@@ -142,7 +143,7 @@ export function SettingsPage({
 
     const addLog = (type: string, ...args: any[]) => {
       const timestamp = new Date().toLocaleTimeString()
-      const message = args.map(arg => 
+      const message = args.map(arg =>
         typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
       ).join(' ')
       setDebugLogs(prev => [...prev.slice(-99), `[${timestamp}] [${type}] ${message}`])
@@ -185,13 +186,22 @@ export function SettingsPage({
 
   // Helper for nested config changes
   const handleNestedChange = (section: keyof AppConfig, field: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [section]: {
-        ...(prev[section] as any || {}),
-        [field]: value
+    setFormData(prev => {
+      const updated = {
+        ...prev,
+        [section]: {
+          ...(prev[section] as any || {}),
+          [field]: value
+        }
       }
-    }))
+
+      // Apply appearance changes immediately
+      if (section === 'appearance') {
+        saveAppearance({ [field]: value })
+      }
+
+      return updated
+    })
   }
 
   const handleHotkeyChange = (field: keyof HotkeyConfig, value: string) => {
@@ -212,12 +222,12 @@ export function SettingsPage({
       alert("Test connection only works in the desktop app, not in a web browser.")
       return
     }
-    
+
     setIsTesting(true)
     try {
       // 1. Get the test image path
       const imagePath = await invoke<string>('get_test_image_path')
-      
+
       // 2. Upload the file
       const response = await invoke<UploadResponse>('upload_file', {
         filePath: imagePath,
@@ -225,7 +235,7 @@ export function SettingsPage({
         uploadToken: formData.uploadToken,
         visibility: 'PUBLIC',
       })
-      
+
       setTestResult({
         url: response.url,
         name: response.name,
@@ -252,30 +262,29 @@ export function SettingsPage({
   const handleSave = () => {
     onSave(formData)
     setSaveSuccess(true)
+    playSettingsSave()
   }
 
   const tabs = [
     { id: 'account' as const, label: 'Account', icon: User },
-    { id: 'upload' as const, label: 'Upload', icon: Upload },
-    { id: 'hotkeys' as const, label: 'Hotkeys', icon: Keyboard },
     { id: 'capture' as const, label: 'Capture', icon: Camera },
-    { id: 'appearance' as const, label: 'Appearance', icon: Palette },
-    { id: 'about' as const, label: 'About', icon: Info },
+    { id: 'hotkeys' as const, label: 'Hotkeys', icon: Keyboard },
+    { id: 'preferences' as const, label: 'Preferences', icon: Palette },
+    { id: 'application' as const, label: 'About', icon: Info },
   ]
 
   return (
     <div className="space-y-6">
       {/* Tabs */}
-      <div className="flex gap-1 overflow-x-auto pb-1 -mx-3 px-3 lg:mx-0 lg:px-0 scrollbar-none">
+      <div className="flex gap-1 px-3 pb-1 -mx-3 overflow-x-auto lg:mx-0 lg:px-0 scrollbar-none">
         {tabs.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-300 whitespace-nowrap ${
-              activeTab === tab.id
-                ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25'
-                : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-300 whitespace-nowrap ${activeTab === tab.id
+              ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25'
+              : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
+              }`}
           >
             <tab.icon size={16} />
             <span className="hidden sm:inline">{tab.label}</span>
@@ -284,22 +293,22 @@ export function SettingsPage({
       </div>
 
       {/* Content Area */}
-      <div className="glass-card p-4 lg:p-6 space-y-6 animate-fade-in">
+      <div className="p-4 space-y-6 glass-card lg:p-6 animate-fade-in">
         {/* Account Tab */}
         {activeTab === 'account' && (
           <div className="space-y-6">
             <SettingsSection icon={User} title="Account" description="Manage your Emberly account">
               {formData.user ? (
-                <div className="glass-card p-4 space-y-3">
+                <div className="p-4 space-y-3 glass-card">
                   <div className="flex items-center gap-4">
                     {formData.user.image ? (
-                      <img 
-                        src={formData.user.image} 
-                        alt={formData.user.name || ''} 
-                        className="w-14 h-14 rounded-xl object-cover border-2 border-primary/30"
+                      <img
+                        src={formData.user.image}
+                        alt={formData.user.name || ''}
+                        className="object-cover border-2 w-14 h-14 rounded-xl border-primary/30"
                       />
                     ) : (
-                      <div className="w-14 h-14 rounded-xl bg-primary/20 flex items-center justify-center border-2 border-primary/30">
+                      <div className="flex items-center justify-center border-2 w-14 h-14 rounded-xl bg-primary/20 border-primary/30">
                         <User size={24} className="text-primary" />
                       </div>
                     )}
@@ -319,13 +328,13 @@ export function SettingsPage({
                   )}
                 </div>
               ) : (
-                <div className="glass-card p-6 text-center space-y-4">
-                  <div className="w-16 h-16 rounded-xl bg-primary/20 flex items-center justify-center border-2 border-primary/30 mx-auto">
+                <div className="p-6 space-y-4 text-center glass-card">
+                  <div className="flex items-center justify-center w-16 h-16 mx-auto border-2 rounded-xl bg-primary/20 border-primary/30">
                     <User size={28} className="text-primary" />
                   </div>
                   <div>
                     <p className="font-medium text-foreground">Not signed in</p>
-                    <p className="text-sm text-muted-foreground mt-1">Sign in to sync your settings</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Sign in to sync your settings</p>
                   </div>
                   {onLogin && (
                     <button
@@ -339,7 +348,7 @@ export function SettingsPage({
               )}
             </SettingsSection>
 
-            <SettingsSection icon={Lock} title="API Token" description="Your upload authentication token">
+            <SettingsSection icon={Shield} title="API Token" description="Your upload authentication token">
               <div className="space-y-3">
                 <div className="relative">
                   <input
@@ -347,17 +356,17 @@ export function SettingsPage({
                     value={formData.uploadToken || ''}
                     onChange={(e) => handleChange('uploadToken', e.target.value)}
                     placeholder="Enter your API token"
-                    className="w-full px-4 py-3 pr-12 bg-secondary/50 border border-border/50 rounded-xl text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all font-mono text-sm"
+                    className="w-full px-4 py-3 pr-12 font-mono text-sm transition-all border bg-secondary/50 border-border/50 rounded-xl text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
+                    className="absolute p-1 transition-colors -translate-y-1/2 right-3 top-1/2 text-muted-foreground hover:text-foreground"
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
-                
+
                 <button
                   onClick={handleTestConnection}
                   disabled={isTesting || !formData.uploadToken}
@@ -370,7 +379,7 @@ export function SettingsPage({
                     </>
                   ) : (
                     <>
-                      <RefreshCw size={16} />
+                      <Zap size={16} />
                       Test Connection
                     </>
                   )}
@@ -380,119 +389,192 @@ export function SettingsPage({
           </div>
         )}
 
-        {/* Upload Tab */}
-        {activeTab === 'upload' && (
+        {/* Capture Tab - Combined Upload + Capture settings */}
+        {activeTab === 'capture' && (
           <div className="space-y-6">
-            <SettingsSection icon={Globe} title="Default Visibility" description="Who can see your uploads">
-              <div className="grid grid-cols-2 gap-2">
-                {(['PUBLIC', 'PRIVATE'] as const).map(vis => (
-                  <button
-                    key={vis}
-                    onClick={() => handleChange('visibility', vis)}
-                    className={`px-4 py-3 rounded-xl font-medium text-sm transition-all duration-200 ${
-                      formData.visibility === vis
-                        ? 'bg-primary text-primary-foreground shadow-lg'
-                        : 'bg-secondary/50 text-muted-foreground hover:text-foreground hover:bg-secondary'
-                    }`}
+            {/* Image Settings */}
+            <SettingsSection icon={Image} title="Screenshot Settings" description="Format, quality, and file options">
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground">Format</label>
+                    <select
+                      value={formData.capture?.format || 'png'}
+                      onChange={(e) => handleNestedChange('capture', 'format', e.target.value)}
+                      className="w-full px-4 py-2.5 bg-secondary/50 border border-border/50 rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    >
+                      <option value="png">PNG</option>
+                      <option value="jpg">JPG</option>
+                    </select>
+                  </div>
+
+                  {formData.capture?.format === 'jpg' && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-muted-foreground">Quality ({formData.capture?.quality || 90}%)</label>
+                      <input
+                        type="range"
+                        min="10"
+                        max="100"
+                        value={formData.capture?.quality || 90}
+                        onChange={(e) => handleNestedChange('capture', 'quality', parseInt(e.target.value))}
+                        className="w-full h-2 mt-3 rounded-lg appearance-none cursor-pointer bg-secondary accent-primary"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div
+                    onClick={() => handleNestedChange('capture', 'includeCursor', !(formData.capture?.includeCursor ?? true))}
+                    className="flex items-center justify-between p-3 transition-colors cursor-pointer rounded-xl bg-secondary/30 hover:bg-secondary/50"
                   >
-                    {vis.charAt(0) + vis.slice(1).toLowerCase()}
-                  </button>
-                ))}
+                    <div className="flex items-center gap-2">
+                      <MousePointer size={16} className="text-muted-foreground" />
+                      <span className="text-sm text-foreground">Cursor</span>
+                    </div>
+                    <div className={`w-9 h-5 rounded-full p-0.5 transition-colors ${(formData.capture?.includeCursor ?? true) ? 'bg-primary' : 'bg-muted'
+                      }`}>
+                      <div className={`w-4 h-4 rounded-full bg-white transition-transform ${(formData.capture?.includeCursor ?? true) ? 'translate-x-4' : ''
+                        }`} />
+                    </div>
+                  </div>
+
+                  <div
+                    onClick={() => handleNestedChange('capture', 'saveLocally', !(formData.capture?.saveLocally ?? false))}
+                    className="flex items-center justify-between p-3 transition-colors cursor-pointer rounded-xl bg-secondary/30 hover:bg-secondary/50"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Volume2 size={16} className="text-muted-foreground" />
+                      <span className="text-sm text-foreground">Save Local</span>
+                    </div>
+                    <div className={`w-9 h-5 rounded-full p-0.5 transition-colors ${(formData.capture?.saveLocally ?? false) ? 'bg-primary' : 'bg-muted'
+                      }`}>
+                      <div className={`w-4 h-4 rounded-full bg-white transition-transform ${(formData.capture?.saveLocally ?? false) ? 'translate-x-4' : ''
+                        }`} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Delay (seconds)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="10"
+                    value={formData.capture?.delay || 0}
+                    onChange={(e) => handleNestedChange('capture', 'delay', parseInt(e.target.value))}
+                    className="w-full px-4 py-2.5 bg-secondary/50 border border-border/50 rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                </div>
               </div>
             </SettingsSection>
 
-            <SettingsSection icon={Lock} title="Password Protection" description="Optional password for uploads">
-              <input
-                type="password"
-                value={formData.password || ''}
-                onChange={(e) => handleChange('password', e.target.value || undefined)}
-                placeholder="Leave blank for no password"
-                className="w-full px-4 py-3 bg-secondary/50 border border-border/50 rounded-xl text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all"
-              />
-            </SettingsSection>
-
-            <SettingsSection icon={Bell} title="Behavior" description="Upload and notification settings">
-              <div className="space-y-3">
-                 {/* Post Upload Action */}
-                <div className="p-4 rounded-xl bg-secondary/30 space-y-3">
-                   <label className="text-sm font-medium text-foreground block">After Upload Complete</label>
-                   <div className="flex gap-2">
-                      {(['copy', 'open', 'none'] as const).map(action => (
-                        <button
-                          key={action}
-                          onClick={() => handleNestedChange('behavior', 'postUploadAction', action)}
-                          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-                            formData.behavior?.postUploadAction === action 
-                              ? 'bg-primary text-primary-foreground' 
-                              : 'bg-background/50 hover:bg-secondary text-muted-foreground'
-                          }`}
-                        >
-                          {action === 'copy' ? 'Copy URL' : action === 'open' ? 'Open URL' : 'Do Nothing'}
-                        </button>
-                      ))}
-                   </div>
-                </div>
-                
-                 {/* Clipboard Format */}
-                <div className="p-4 rounded-xl bg-secondary/30 space-y-3">
-                   <label className="text-sm font-medium text-foreground block">Clipboard Format</label>
-                   <div className="grid grid-cols-2 gap-2">
-                      {(['url', 'raw-url', 'markdown', 'html'] as const).map(format => (
-                        <button
-                          key={format}
-                          onClick={() => handleNestedChange('behavior', 'clipboardFormat', format)}
-                          className={`py-2 rounded-lg text-xs font-medium transition-colors border ${
-                            formData.behavior?.clipboardFormat === format 
-                              ? 'bg-primary/10 text-primary border-primary/20' 
-                              : 'bg-background/50 text-muted-foreground border-transparent hover:bg-secondary'
-                          }`}
-                        >
-                          {format === 'url' ? 'Direct URL' : 
-                           format === 'raw-url' ? 'Raw URL' : 
-                           format.charAt(0).toUpperCase() + format.slice(1)}
-                        </button>
-                      ))}
-                   </div>
+            {/* Upload Settings */}
+            <SettingsSection icon={Camera} title="Upload Settings" description="Visibility and post-upload behavior">
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-2">
+                  {(['PUBLIC', 'PRIVATE'] as const).map(vis => (
+                    <button
+                      key={vis}
+                      onClick={() => handleChange('visibility', vis)}
+                      className={`px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${formData.visibility === vis
+                        ? 'bg-primary text-primary-foreground shadow-lg'
+                        : 'bg-secondary/50 text-muted-foreground hover:text-foreground hover:bg-secondary'
+                        }`}
+                    >
+                      {vis === 'PUBLIC' ? '🌐 Public' : '🔒 Private'}
+                    </button>
+                  ))}
                 </div>
 
-                <label className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 cursor-pointer transition-colors">
-                  <div className="flex items-center gap-3">
-                    <Volume2 size={18} className="text-muted-foreground" />
-                    <span className="text-sm font-medium text-foreground">Play Sound on Success</span>
-                  </div>
+                {/* Password Protection */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Password Protection</label>
                   <input
-                    type="checkbox"
-                    checked={formData.behavior?.playSound ?? true}
-                    onChange={(e) => handleNestedChange('behavior', 'playSound', e.target.checked)}
-                    className="w-5 h-5 rounded-lg border-border accent-primary"
+                    type="password"
+                    value={formData.password || ''}
+                    onChange={(e) => handleChange('password', e.target.value || undefined)}
+                    placeholder="Leave blank for no password"
+                    className="w-full px-4 py-2.5 bg-secondary/50 border border-border/50 rounded-xl text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
                   />
-                </label>
+                </div>
 
-                <label className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 cursor-pointer transition-colors">
-                  <div className="flex items-center gap-3">
-                    <Upload size={18} className="text-muted-foreground" />
-                    <span className="text-sm font-medium text-foreground">Auto-upload after capture</span>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">After Upload</label>
+                  <div className="flex gap-2">
+                    {(['copy', 'open', 'none'] as const).map(action => (
+                      <button
+                        key={action}
+                        onClick={() => handleNestedChange('behavior', 'postUploadAction', action)}
+                        className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${formData.behavior?.postUploadAction === action
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-secondary/30 hover:bg-secondary text-muted-foreground'
+                          }`}
+                      >
+                        {action === 'copy' ? 'Copy URL' : action === 'open' ? 'Open' : 'Nothing'}
+                      </button>
+                    ))}
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={formData.autoUpload}
-                    onChange={(e) => handleChange('autoUpload', e.target.checked)}
-                    className="w-5 h-5 rounded-lg border-border accent-primary"
-                  />
-                </label>
+                </div>
 
-                <label className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 cursor-pointer transition-colors">
-                  <div className="flex items-center gap-3">
-                    <Bell size={18} className="text-muted-foreground" />
-                    <span className="text-sm font-medium text-foreground">Show notifications</span>
+                {/* Clipboard Format */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Clipboard Format</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(['url', 'raw-url', 'markdown', 'html'] as const).map(format => (
+                      <button
+                        key={format}
+                        onClick={() => handleNestedChange('behavior', 'clipboardFormat', format)}
+                        className={`py-2 rounded-lg text-xs font-medium transition-colors border ${formData.behavior?.clipboardFormat === format
+                          ? 'bg-primary/10 text-primary border-primary/20'
+                          : 'bg-secondary/30 text-muted-foreground border-transparent hover:bg-secondary'
+                          }`}
+                      >
+                        {format === 'url' ? 'Direct URL' :
+                          format === 'raw-url' ? 'Raw URL' :
+                            format.charAt(0).toUpperCase() + format.slice(1)}
+                      </button>
+                    ))}
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={formData.defaultNotification}
-                    onChange={(e) => handleChange('defaultNotification', e.target.checked)}
-                    className="w-5 h-5 rounded-lg border-border accent-primary"
-                  />
-                </label>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div
+                    onClick={() => handleChange('autoUpload', !formData.autoUpload)}
+                    className="flex items-center justify-between p-3 transition-colors cursor-pointer rounded-xl bg-secondary/30 hover:bg-secondary/50"
+                  >
+                    <span className="text-sm text-foreground">Auto Upload</span>
+                    <div className={`w-9 h-5 rounded-full p-0.5 transition-colors ${formData.autoUpload ? 'bg-primary' : 'bg-muted'
+                      }`}>
+                      <div className={`w-4 h-4 rounded-full bg-white transition-transform ${formData.autoUpload ? 'translate-x-4' : ''
+                        }`} />
+                    </div>
+                  </div>
+
+                  <div
+                    onClick={() => handleChange('defaultNotification', !formData.defaultNotification)}
+                    className="flex items-center justify-between p-3 transition-colors cursor-pointer rounded-xl bg-secondary/30 hover:bg-secondary/50"
+                  >
+                    <span className="text-sm text-foreground">Notifications</span>
+                    <div className={`w-9 h-5 rounded-full p-0.5 transition-colors ${formData.defaultNotification ? 'bg-primary' : 'bg-muted'
+                      }`}>
+                      <div className={`w-4 h-4 rounded-full bg-white transition-transform ${formData.defaultNotification ? 'translate-x-4' : ''
+                        }`} />
+                    </div>
+                  </div>
+
+                  <div
+                    onClick={() => handleNestedChange('behavior', 'playSound', !(formData.behavior?.playSound ?? true))}
+                    className="flex items-center justify-between p-3 transition-colors cursor-pointer rounded-xl bg-secondary/30 hover:bg-secondary/50"
+                  >
+                    <span className="text-sm text-foreground">Play Sound</span>
+                    <div className={`w-9 h-5 rounded-full p-0.5 transition-colors ${(formData.behavior?.playSound ?? true) ? 'bg-primary' : 'bg-muted'
+                      }`}>
+                      <div className={`w-4 h-4 rounded-full bg-white transition-transform ${(formData.behavior?.playSound ?? true) ? 'translate-x-4' : ''
+                        }`} />
+                    </div>
+                  </div>
+                </div>
               </div>
             </SettingsSection>
           </div>
@@ -501,17 +583,17 @@ export function SettingsPage({
         {/* Hotkeys Tab */}
         {activeTab === 'hotkeys' && (
           <div className="space-y-6">
-            <div className="p-4 rounded-xl bg-primary/10 border border-primary/20 flex items-start gap-3">
-              <AlertTriangle size={18} className="text-primary flex-shrink-0 mt-0.5" />
+            <div className="flex items-start gap-3 p-4 border rounded-xl bg-primary/10 border-primary/20">
+              <Bug size={18} className="text-primary flex-shrink-0 mt-0.5" />
               <p className="text-sm text-foreground/80">
                 Click the input field and press your desired key combination. Use Ctrl, Shift, Alt with letters or PrintScreen.
               </p>
             </div>
 
-            <SettingsSection icon={Monitor} title="Screenshot Hotkeys" description="Customize capture shortcuts">
+            <SettingsSection icon={Camera} title="Screenshot Hotkeys" description="Customize capture shortcuts">
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground block mb-2">
+                  <label className="block mb-2 text-sm font-medium text-muted-foreground">
                     Fullscreen Screenshot
                   </label>
                   <HotkeyInput
@@ -522,7 +604,7 @@ export function SettingsPage({
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground block mb-2">
+                  <label className="block mb-2 text-sm font-medium text-muted-foreground">
                     All Monitors Screenshot
                   </label>
                   <HotkeyInput
@@ -533,7 +615,7 @@ export function SettingsPage({
                 </div>
 
                 <div className="opacity-50">
-                  <label className="text-sm font-medium text-muted-foreground block mb-2">
+                  <label className="block mb-2 text-sm font-medium text-muted-foreground">
                     Region Screenshot <span className="text-xs">(Coming soon)</span>
                   </label>
                   <HotkeyInput
@@ -543,140 +625,28 @@ export function SettingsPage({
                     disabled
                   />
                 </div>
+
+                <div>
+                  <label className="block mb-2 text-sm font-medium text-muted-foreground">
+                    Upload from Clipboard
+                  </label>
+                  <HotkeyInput
+                    value={formData.hotkeys?.uploadClipboard || ''}
+                    onChange={(value) => handleHotkeyChange('uploadClipboard', value)}
+                    placeholder="e.g., Control+Alt+U"
+                  />
+                </div>
               </div>
             </SettingsSection>
           </div>
         )}
 
-        {/* Capture Tab */}
-        {activeTab === 'capture' && (
+        {/* Preferences Tab - Combined Appearance + Sounds */}
+        {activeTab === 'preferences' && (
           <div className="space-y-6">
-            <SettingsSection icon={Image} title="Image Settings" description="Format and quality configuration">
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-muted-foreground">File Format</label>
-                    <select
-                      value={formData.capture?.format || 'png'}
-                      onChange={(e) => handleNestedChange('capture', 'format', e.target.value)}
-                      className="w-full px-4 py-3 bg-secondary/50 border border-border/50 rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                    >
-                      <option value="png">PNG (Lossless)</option>
-                      <option value="jpg">JPG (Smaller size)</option>
-                    </select>
-                  </div>
-                  
-                  {formData.capture?.format === 'jpg' && (
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-muted-foreground">Quality ({formData.capture?.quality}%)</label>
-                      <input
-                        type="range"
-                        min="10"
-                        max="100"
-                        value={formData.capture?.quality || 90}
-                        onChange={(e) => handleNestedChange('capture', 'quality', parseInt(e.target.value))}
-                        className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <label className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 cursor-pointer transition-colors">
-                  <div className="flex items-center gap-3">
-                    <Download size={18} className="text-muted-foreground" />
-                    <span className="text-sm font-medium text-foreground">Save Locally</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={formData.capture?.saveLocally ?? false}
-                    onChange={(e) => handleNestedChange('capture', 'saveLocally', e.target.checked)}
-                    className="w-5 h-5 rounded-lg border-border accent-primary"
-                  />
-                </label>
-
-                {/* Advanced Capture Settings */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                   <div 
-                      onClick={(_e) => {
-                         // Simplify toggle logic
-                         const newValue = !(formData.capture?.includeCursor ?? true)
-                         handleNestedChange('capture', 'includeCursor', newValue)
-                      }}
-                      className="p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 cursor-pointer transition-colors flex items-center justify-between"
-                   >
-                     <div className="flex items-center gap-3">
-                       <MousePointer size={18} className="text-muted-foreground" />
-                       <span className="text-sm font-medium text-foreground">Include Cursor</span>
-                     </div>
-                     <div className={`w-10 h-6 rounded-full p-1 transition-colors ${
-                       (formData.capture?.includeCursor ?? true) ? 'bg-primary' : 'bg-muted'
-                     }`}>
-                       <div className={`w-4 h-4 rounded-full bg-white transition-transform ${
-                         (formData.capture?.includeCursor ?? true) ? 'translate-x-4' : ''
-                       }`} />
-                     </div>
-                   </div>
-                </div>
-              </div>
-            </SettingsSection>
-
-            <SettingsSection icon={Clock} title="Timer & Delay" description="Delay before determining capture area">
-               <div className="space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">Capture Delay (Seconds)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="10"
-                    value={formData.capture?.delay || 0}
-                    onChange={(e) => handleNestedChange('capture', 'delay', parseInt(e.target.value))}
-                    className="w-full px-4 py-3 bg-secondary/50 border border-border/50 rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-               </div>
-            </SettingsSection>
-
-            <SettingsSection icon={FileText} title="Filename Pattern" description="Customize how files are named">
-              <div className="space-y-2">
-                 <input
-                    type="text"
-                    value={formData.capture?.filenamePattern || 'Screenshot_%Y-%m-%d_%H-%M-%S'}
-                    onChange={(e) => handleNestedChange('capture', 'filenamePattern', e.target.value)}
-                    className="w-full px-4 py-3 bg-secondary/50 border border-border/50 rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono text-sm"
-                    placeholder="Screenshot_%Y-%m-%d_%H-%M-%S"
-                  />
-                  <p className="text-xs text-muted-foreground">Available variables: %Y, %m, %d, %H, %M, %S</p>
-              </div>
-            </SettingsSection>
-          </div>
-        )}
-
-        {/* Appearance Tab */}
-        {activeTab === 'appearance' && (
-          <div className="space-y-6">
-             <SettingsSection icon={Moon} title="UI Customization" description="Fine-tune the look and feel">
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-muted-foreground">Font Size</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {(['small', 'medium', 'large'] as const).map(scale => (
-                        <button
-                          key={scale}
-                          onClick={() => handleNestedChange('appearance', 'fontScale', scale)}
-                          className={`py-2 rounded-lg text-xs font-medium transition-colors border ${
-                            (formData.appearance?.fontScale || 'medium') === scale
-                              ? 'bg-primary text-primary-foreground border-primary'
-                              : 'bg-secondary/30 text-muted-foreground border-transparent hover:bg-secondary/50'
-                          }`}
-                        >
-                          {scale.charAt(0).toUpperCase() + scale.slice(1)}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-             </SettingsSection>
-
-            <SettingsSection icon={Palette} title="Theme" description="Choose your preferred color scheme">
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {/* Theme Selection */}
+            <SettingsSection icon={Palette} title="Theme" description="Choose your color scheme">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {presets.map(preset => (
                   <ThemePreviewCard
                     key={preset.name}
@@ -688,48 +658,188 @@ export function SettingsPage({
               </div>
             </SettingsSection>
 
-            <div className="p-4 rounded-xl bg-secondary/30 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-foreground">Current Theme</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{currentTheme}</p>
+            {/* Typography & Layout */}
+            <SettingsSection icon={FileText} title="Display" description="Font and layout options">
+              <div className="space-y-4">
+                {/* Font Family */}
+                <div className="space-y-2">
+                  <label className="text-xs font-medium tracking-wide uppercase text-muted-foreground">Font</label>
+                  <div className="grid grid-cols-5 gap-2">
+                    {([
+                      { id: 'system', label: 'System' },
+                      { id: 'inter', label: 'Inter' },
+                      { id: 'roboto', label: 'Roboto' },
+                      { id: 'mono', label: 'Mono' },
+                      { id: 'poppins', label: 'Poppins' },
+                    ] as const).map(font => (
+                      <button
+                        key={font.id}
+                        onClick={() => handleNestedChange('appearance', 'fontFamily', font.id)}
+                        className={`py-2 rounded-lg text-xs font-medium transition-all ${(formData.appearance?.fontFamily || 'system') === font.id
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-secondary/30 text-muted-foreground hover:bg-secondary/50'
+                          }`}
+                      >
+                        {font.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Font Size + Corner Roundness Row */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium tracking-wide uppercase text-muted-foreground">Size</label>
+                    <div className="grid grid-cols-3 gap-1">
+                      {(['small', 'medium', 'large'] as const).map(size => (
+                        <button
+                          key={size}
+                          onClick={() => handleNestedChange('appearance', 'fontScale', size)}
+                          className={`py-2 rounded-lg text-xs font-medium transition-all capitalize ${(formData.appearance?.fontScale || 'medium') === size
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-secondary/30 text-muted-foreground hover:bg-secondary/50'
+                            }`}
+                        >
+                          {size[0].toUpperCase()}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium tracking-wide uppercase text-muted-foreground">Corners</label>
+                    <div className="grid grid-cols-4 gap-1">
+                      {(['none', 'small', 'medium', 'large'] as const).map(r => (
+                        <button
+                          key={r}
+                          onClick={() => handleNestedChange('appearance', 'borderRadius', r)}
+                          className={`py-2 rounded-lg text-xs font-medium transition-all ${(formData.appearance?.borderRadius || 'medium') === r
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-secondary/30 text-muted-foreground hover:bg-secondary/50'
+                            }`}
+                        >
+                          {r === 'none' ? '▢' : r === 'small' ? '◜' : r === 'medium' ? '◠' : '⬬'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Visual Effects Toggles */}
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => handleNestedChange('appearance', 'animations', !(formData.appearance?.animations ?? true))}
+                    className={`p-3 rounded-lg text-center transition-all ${(formData.appearance?.animations ?? true)
+                      ? 'bg-primary/20 border border-primary/30'
+                      : 'bg-secondary/30 border border-transparent'
+                      }`}
+                  >
+                    <Zap size={18} className={`mx-auto mb-1 ${(formData.appearance?.animations ?? true) ? 'text-primary' : 'text-muted-foreground'}`} />
+                    <span className="text-xs font-medium">Motion</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleNestedChange('appearance', 'glassEffect', !(formData.appearance?.glassEffect ?? true))}
+                    className={`p-3 rounded-lg text-center transition-all ${(formData.appearance?.glassEffect ?? true)
+                      ? 'bg-primary/20 border border-primary/30'
+                      : 'bg-secondary/30 border border-transparent'
+                      }`}
+                  >
+                    <Moon size={18} className={`mx-auto mb-1 ${(formData.appearance?.glassEffect ?? true) ? 'text-primary' : 'text-muted-foreground'}`} />
+                    <span className="text-xs font-medium">Glass</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleNestedChange('appearance', 'compactMode', !(formData.appearance?.compactMode ?? false))}
+                    className={`p-3 rounded-lg text-center transition-all ${(formData.appearance?.compactMode ?? false)
+                      ? 'bg-primary/20 border border-primary/30'
+                      : 'bg-secondary/30 border border-transparent'
+                      }`}
+                  >
+                    <Camera size={18} className={`mx-auto mb-1 ${(formData.appearance?.compactMode ?? false) ? 'text-primary' : 'text-muted-foreground'}`} />
+                    <span className="text-xs font-medium">Compact</span>
+                  </button>
+                </div>
               </div>
-              <div className="flex gap-1.5">
-                {(() => {
-                  const currentPreset = presets.find(p => p.name === currentTheme)
-                  return currentPreset ? (
-                    <>
-                      <div 
-                        className="w-8 h-8 rounded-lg border border-white/20"
-                        style={{ backgroundColor: currentPreset.primary }}
-                      />
-                      <div 
-                        className="w-8 h-8 rounded-lg border border-white/20"
-                        style={{ backgroundColor: currentPreset.secondary }}
-                      />
-                    </>
-                  ) : null
-                })()}
-              </div>
-            </div>
+            </SettingsSection>
+
+            {/* Sounds */}
+            {soundsLoaded && (
+              <SettingsSection icon={Volume2} title="Sounds" description="Audio feedback">
+                <div className="space-y-3">
+                  {/* Master Toggle */}
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-secondary/30">
+                    <span className="font-medium text-foreground">Enable Sounds</span>
+                    <button
+                      onClick={() => savePreferences({ enabled: !soundPrefs.enabled })}
+                      className={`w-11 h-6 rounded-full transition-all ${soundPrefs.enabled ? 'bg-primary' : 'bg-secondary/50'
+                        } flex items-center px-0.5`}
+                    >
+                      <div className={`w-5 h-5 bg-white rounded-full transition-transform shadow-sm ${soundPrefs.enabled ? 'translate-x-5' : ''}`} />
+                    </button>
+                  </div>
+
+                  {/* Sound Options Grid */}
+                  {soundPrefs.enabled && (
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { key: 'uploadSuccess', label: 'Upload Success', icon: Check, color: 'green', play: playUploadSuccess },
+                        { key: 'uploadError', label: 'Upload Error', icon: Bug, color: 'red', play: playUploadError },
+                        { key: 'copyLink', label: 'Copy Link', icon: Copy, color: 'blue', play: playCopyLink },
+                        { key: 'settingsSave', label: 'Settings Save', icon: Save, color: 'purple', play: playSettingsSave },
+                      ].map(sound => (
+                        <div
+                          key={sound.key}
+                          className={`p-3 rounded-lg border transition-all ${soundPrefs[sound.key as keyof typeof soundPrefs]
+                            ? `bg-${sound.color}-500/10 border-${sound.color}-500/30`
+                            : 'bg-secondary/20 border-transparent'
+                            }`}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <sound.icon size={14} className={soundPrefs[sound.key as keyof typeof soundPrefs] ? `text-${sound.color}-400` : 'text-muted-foreground'} />
+                              <span className="text-xs font-medium">{sound.label}</span>
+                            </div>
+                            <button
+                              onClick={() => savePreferences({ [sound.key]: !soundPrefs[sound.key as keyof typeof soundPrefs] })}
+                              className={`w-8 h-4 rounded-full transition-all ${soundPrefs[sound.key as keyof typeof soundPrefs] ? 'bg-primary' : 'bg-secondary/50'
+                                } flex items-center px-0.5`}
+                            >
+                              <div className={`w-3 h-3 bg-white rounded-full transition-transform ${soundPrefs[sound.key as keyof typeof soundPrefs] ? 'translate-x-4' : ''}`} />
+                            </button>
+                          </div>
+                          <button
+                            onClick={sound.play}
+                            className="w-full py-1.5 text-xs font-medium bg-white/5 hover:bg-white/10 rounded transition-colors"
+                          >
+                            ▶ Preview
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </SettingsSection>
+            )}
           </div>
         )}
 
-        {/* About Tab */}
-        {activeTab === 'about' && (
+        {/* Application Tab */}
+        {activeTab === 'application' && (
           <div className="space-y-6">
             {/* App Info */}
-            <div className="text-center py-6">
-              <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-primary/30 mb-4">
+            <div className="py-6 text-center">
+              <div className="flex items-center justify-center w-20 h-20 mx-auto mb-4 border rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border-primary/30">
                 <Logo size={48} primaryColor="#ffffff" accentColor="hsl(var(--primary))" />
               </div>
               <h2 className="text-2xl font-bold text-foreground">{APP_NAME}</h2>
-              <p className="text-muted-foreground mt-1">Version {APP_VERSION}</p>
+              <p className="mt-1 text-muted-foreground">Version {APP_VERSION}</p>
             </div>
 
             {/* Description */}
-            <div className="glass-card p-4 text-center">
+            <div className="p-4 text-center glass-card">
               <p className="text-sm text-muted-foreground">
-                A powerful, ShareX-like screenshot and upload tool for Emberly. 
+                A powerful, ShareX-like screenshot and upload tool for Emberly.
                 Capture, upload, and share instantly with global hotkeys.
               </p>
             </div>
@@ -738,7 +848,7 @@ export function SettingsPage({
             <SettingsSection icon={Download} title="Updates" description="Check for new versions">
               <div className="space-y-3">
                 {updateInfo?.available ? (
-                  <div className="glass-card p-4 border border-primary/30 space-y-3">
+                  <div className="p-4 space-y-3 border glass-card border-primary/30">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
                       <span className="text-sm font-medium text-primary">Update Available!</span>
@@ -753,13 +863,13 @@ export function SettingsPage({
                     )}
                     {updateInfo.downloading ? (
                       <div className="space-y-2">
-                        <div className="h-2 bg-secondary/30 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-primary rounded-full transition-all duration-300"
+                        <div className="h-2 overflow-hidden rounded-full bg-secondary/30">
+                          <div
+                            className="h-full transition-all duration-300 rounded-full bg-primary"
                             style={{ width: `${updateInfo.progress || 0}%` }}
                           />
                         </div>
-                        <p className="text-xs text-muted-foreground text-center">
+                        <p className="text-xs text-center text-muted-foreground">
                           Downloading... {updateInfo.progress || 0}%
                         </p>
                       </div>
@@ -786,7 +896,7 @@ export function SettingsPage({
                     <button
                       onClick={onCheckForUpdates}
                       disabled={checkingForUpdates}
-                      className="px-4 py-2 bg-secondary/50 hover:bg-secondary rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+                      className="flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors rounded-lg bg-secondary/50 hover:bg-secondary disabled:opacity-50"
                     >
                       <RefreshCw size={14} className={checkingForUpdates ? 'animate-spin' : ''} />
                       Check
@@ -797,66 +907,86 @@ export function SettingsPage({
             </SettingsSection>
 
             {/* Debug/Logs Section */}
-            <SettingsSection icon={Bug} title="Debug" description="Logs and diagnostics">
-              <div className="space-y-3">
-                <button
-                  onClick={() => setShowDebugPanel(!showDebugPanel)}
-                  className="w-full flex items-center justify-between p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <Terminal size={18} className="text-muted-foreground" />
-                    <span className="text-sm font-medium text-foreground">Console Logs</span>
-                  </div>
-                  <span className="text-xs text-muted-foreground">
-                    {debugLogs.length} entries
-                  </span>
-                </button>
-
-                {showDebugPanel && (
-                  <div className="glass-card p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Recent logs</span>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(debugLogs.join('\n'))
-                          }}
-                          className="p-1.5 hover:bg-secondary rounded transition-colors"
-                          title="Copy logs"
-                        >
-                          <Copy size={14} className="text-muted-foreground" />
-                        </button>
-                        <button
-                          onClick={() => setDebugLogs([])}
-                          className="p-1.5 hover:bg-secondary rounded transition-colors"
-                          title="Clear logs"
-                        >
-                          <Trash2 size={14} className="text-muted-foreground" />
-                        </button>
-                      </div>
+            <SettingsSection icon={Bug} title="Debug & Support" description="Logs, diagnostics, and device information">
+              <div className="space-y-4">
+                {/* Device Info Collapsible */}
+                <details className="group">
+                  <summary className="flex items-center justify-between p-4 list-none transition-colors cursor-pointer rounded-xl bg-secondary/30 hover:bg-secondary/50">
+                    <div className="flex items-center gap-3">
+                      <Monitor size={18} className="text-muted-foreground" />
+                      <span className="text-sm font-medium text-foreground">Device Information</span>
                     </div>
-                    <div className="h-48 overflow-auto bg-black/30 rounded-lg p-2 font-mono text-xs">
+                    <ChevronDown size={16} className="transition-transform text-muted-foreground group-open:rotate-180" />
+                  </summary>
+                  <div className="p-4 mt-2 border rounded-xl bg-secondary/20 border-border/30">
+                    <DeviceInfoPanel />
+                  </div>
+                </details>
+
+                {/* Audit Logs Collapsible */}
+                <details className="group">
+                  <summary className="flex items-center justify-between p-4 list-none transition-colors cursor-pointer rounded-xl bg-secondary/30 hover:bg-secondary/50">
+                    <div className="flex items-center gap-3">
+                      <FileText size={18} className="text-muted-foreground" />
+                      <span className="text-sm font-medium text-foreground">Activity Logs</span>
+                    </div>
+                    <ChevronDown size={16} className="transition-transform text-muted-foreground group-open:rotate-180" />
+                  </summary>
+                  <div className="p-4 mt-2 border rounded-xl bg-secondary/20 border-border/30">
+                    <AuditLogPanel initialLimit={100} />
+                  </div>
+                </details>
+
+                {/* Console Logs Collapsible */}
+                <details className="group">
+                  <summary className="flex items-center justify-between p-4 list-none transition-colors cursor-pointer rounded-xl bg-secondary/30 hover:bg-secondary/50">
+                    <div className="flex items-center gap-3">
+                      <Bug size={18} className="text-muted-foreground" />
+                      <span className="text-sm font-medium text-foreground">Console Logs</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">{debugLogs.length} entries</span>
+                      <ChevronDown size={16} className="transition-transform text-muted-foreground group-open:rotate-180" />
+                    </div>
+                  </summary>
+                  <div className="p-3 mt-2 space-y-2 border rounded-xl bg-secondary/20 border-border/30">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => navigator.clipboard.writeText(debugLogs.join('\n'))}
+                        className="p-1.5 hover:bg-secondary rounded transition-colors"
+                        title="Copy logs"
+                      >
+                        <Copy size={14} className="text-muted-foreground" />
+                      </button>
+                      <button
+                        onClick={() => setDebugLogs([])}
+                        className="p-1.5 hover:bg-secondary rounded transition-colors"
+                        title="Clear logs"
+                      >
+                        <Trash2 size={14} className="text-muted-foreground" />
+                      </button>
+                    </div>
+                    <div className="h-48 p-2 overflow-auto font-mono text-xs rounded-lg bg-black/30">
                       {debugLogs.length > 0 ? (
                         debugLogs.map((log, i) => (
-                          <div 
-                            key={i} 
-                            className={`py-0.5 ${
-                              log.includes('[ERROR]') ? 'text-red-400' :
+                          <div
+                            key={i}
+                            className={`py-0.5 ${log.includes('[ERROR]') ? 'text-red-400' :
                               log.includes('[WARN]') ? 'text-yellow-400' :
-                              'text-green-400'
-                            }`}
+                                'text-green-400'
+                              }`}
                           >
                             {log}
                           </div>
                         ))
                       ) : (
-                        <div className="text-muted-foreground/50 text-center py-8">
+                        <div className="py-8 text-center text-muted-foreground/50">
                           No logs yet
                         </div>
                       )}
                     </div>
                   </div>
-                )}
+                </details>
               </div>
             </SettingsSection>
 
@@ -867,48 +997,48 @@ export function SettingsPage({
                   href="https://github.com/EmberlyOSS/Flicker"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors group"
+                  className="flex items-center justify-between p-4 transition-colors rounded-xl bg-secondary/30 hover:bg-secondary/50 group"
                 >
                   <div className="flex items-center gap-3">
                     <Github size={18} className="text-muted-foreground" />
                     <span className="text-sm font-medium text-foreground">GitHub Repository</span>
                   </div>
-                  <ExternalLink size={16} className="text-muted-foreground group-hover:text-foreground transition-colors" />
+                  <ExternalLink size={16} className="transition-colors text-muted-foreground group-hover:text-foreground" />
                 </a>
 
                 <a
                   href="https://embrly.ca"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors group"
+                  className="flex items-center justify-between p-4 transition-colors rounded-xl bg-secondary/30 hover:bg-secondary/50 group"
                 >
                   <div className="flex items-center gap-3">
                     <Globe size={18} className="text-muted-foreground" />
                     <span className="text-sm font-medium text-foreground">Emberly Website</span>
                   </div>
-                  <ExternalLink size={16} className="text-muted-foreground group-hover:text-foreground transition-colors" />
+                  <ExternalLink size={16} className="transition-colors text-muted-foreground group-hover:text-foreground" />
                 </a>
 
                 <a
                   href="https://embrly.ca/discord"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors group"
+                  className="flex items-center justify-between p-4 transition-colors rounded-xl bg-secondary/30 hover:bg-secondary/50 group"
                 >
                   <div className="flex items-center gap-3">
                     <svg className="w-[18px] h-[18px] text-muted-foreground" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+                      <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
                     </svg>
                     <span className="text-sm font-medium text-foreground">Discord Server</span>
                   </div>
-                  <ExternalLink size={16} className="text-muted-foreground group-hover:text-foreground transition-colors" />
+                  <ExternalLink size={16} className="transition-colors text-muted-foreground group-hover:text-foreground" />
                 </a>
               </div>
             </SettingsSection>
 
             {/* Credits */}
             <SettingsSection icon={Heart} title="Credits" description="Built with love">
-              <div className="glass-card p-4 text-center space-y-2">
+              <div className="p-4 space-y-2 text-center glass-card">
                 <p className="text-sm text-muted-foreground">
                   Made with <Heart size={14} className="inline text-red-500 fill-red-500" /> by the Emberly Team
                 </p>
@@ -922,15 +1052,14 @@ export function SettingsPage({
       </div>
 
       {/* Sticky Save Button */}
-      {activeTab !== 'about' && activeTab !== 'appearance' && (
-        <div className="sticky bottom-0 pt-4 pb-2 -mx-4 px-4 bg-gradient-to-t from-background via-background to-transparent">
+      {activeTab !== 'application' && activeTab !== 'preferences' && (
+        <div className="sticky bottom-0 px-4 pt-4 pb-2 -mx-4 bg-gradient-to-t from-background via-background to-transparent">
           <button
             onClick={handleSave}
-            className={`w-full py-3 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center gap-2 ${
-              saveSuccess
-                ? 'bg-green-500 text-white shadow-lg shadow-green-500/25'
-                : 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/25'
-            }`}
+            className={`w-full py-3 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center gap-2 ${saveSuccess
+              ? 'bg-green-500 text-white shadow-lg shadow-green-500/25'
+              : 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/25'
+              }`}
           >
             {saveSuccess ? (
               <>
@@ -946,6 +1075,7 @@ export function SettingsPage({
           </button>
         </div>
       )}
+
       {/* Test Upload Modal */}
       {testResult && (
         <TestUploadModal

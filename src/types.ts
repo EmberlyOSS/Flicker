@@ -11,7 +11,7 @@ export interface AppConfig {
   hotkeys?: HotkeyConfig
   // Screenshot settings
   screenshotMode?: ScreenshotMode
-  
+
   // -- NEW CUSTOMIZATION --
   appearance?: AppearanceConfig
   behavior?: BehaviorConfig
@@ -22,6 +22,12 @@ export interface AppearanceConfig {
   theme: string // 'dark', 'light', 'midnight', etc.
   backgroundOpacity: number // 0.5 to 1.0
   fontScale: 'small' | 'medium' | 'large'
+  fontFamily: 'system' | 'inter' | 'roboto' | 'mono' | 'poppins'
+  borderRadius: 'none' | 'small' | 'medium' | 'large'
+  sidebarPosition: 'left' | 'right'
+  compactMode: boolean
+  animations: boolean
+  glassEffect: boolean
   customColors?: {
     primary: string
     secondary: string
@@ -138,4 +144,37 @@ export interface UploadHistoryItem {
   fileType?: string
   size?: number
   thumbnailUrl?: string
+}
+
+// ============================================================================
+// Notification Types
+// ============================================================================
+
+export type NotificationPriority = 'system' | 'important' | 'default' | 'transient'
+export type NotificationCategory = 'admin' | 'security' | 'account' | 'update' | 'upload' | 'error' | 'info' | 'success'
+
+export interface AppNotification {
+  id: string
+  priority: NotificationPriority
+  category: NotificationCategory
+  title: string
+  message: string
+  timestamp: number
+  read: boolean
+  dismissed: boolean
+  persistent: boolean
+  action_label?: string
+  action_id?: string
+  metadata?: Record<string, unknown>
+}
+
+export interface AddNotificationParams {
+  priority: NotificationPriority
+  category: NotificationCategory
+  title: string
+  message: string
+  persistent?: boolean
+  actionLabel?: string
+  actionId?: string
+  metadata?: Record<string, unknown>
 }

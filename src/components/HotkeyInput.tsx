@@ -119,7 +119,7 @@ export function HotkeyInput({ value, onChange, placeholder, disabled }: HotkeyIn
     }
   }, [isRecording, onChange, buildShortcut])
 
-  const handleKeyUp = useCallback((e: KeyboardEvent) => {
+  const handleKeyUp = useCallback(() => {
     if (!isRecording) return
     
     // Clear keys on all key releases

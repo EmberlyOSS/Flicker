@@ -5,11 +5,11 @@
  * Custom domain support may be added in future releases.
  */
 
-// The Emberly API base URL - hardcoded for alpha release
+// The Emberly API base URL - hardcoded for now
 export const API_URL = 'https://embrly.ca'
 
 // App version
-export const APP_VERSION = '0.1.0-alpha'
+export const APP_VERSION = '0.2.0-beta'
 
 // App name
 export const APP_NAME = 'Flicker'

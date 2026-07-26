@@ -2,238 +2,220 @@ import { useCallback, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { register, unregister, isRegistered } from '@tauri-apps/plugin-global-shortcut';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
-import {
-  isPermissionGranted,
-  requestPermission,
-  sendNotification,
-} from '@tauri-apps/plugin-notification';
-import { useConfig } from './useConfig';
-import { UploadCompleteEvent, HotkeyConfig } from '../types';
+import { sendNotification } from '@tauri-apps/plugin-notification';
+import { UploadCompleteEvent, UploadResponse, HotkeyConfig } from '../types';
 
 interface UseHotkeysOptions {
-  hotkeys?: HotkeyConfig;
-  uploadToken?: string;
-  visibility?: string;
-  apiUrl?: string;
-  enabled?: boolean;
+  hotkeys: HotkeyConfig;
+  uploadToken: string;
+  visibility: string;
+  apiUrl: string;
+  enabled: boolean;
   onScreenshotStart?: () => void;
   onUploadComplete?: (result: UploadCompleteEvent) => void;
   onError?: (error: string) => void;
 }
 
-export function useHotkeys(options?: UseHotkeysOptions) {
-  const { config, isLoading } = useConfig();
+export function useHotkeys(options: UseHotkeysOptions) {
   const isCapturingRef = useRef(false);
   const registeredHotkeysRef = useRef<string[]>([]);
-  
-  // Create a base config that defaults to hook values
-  const getBaseConfig = useCallback((): UseHotkeysOptions => {
-    return {
-      hotkeys: options?.hotkeys || config?.hotkeys,
-      uploadToken: options?.uploadToken || config?.uploadToken,
-      visibility: options?.visibility || config?.visibility || 'PUBLIC',
-      apiUrl: options?.apiUrl || config?.uploadUrl || 'https://embrly.ca',
-      enabled: options?.enabled ?? !!config?.uploadToken,
-      onScreenshotStart: options?.onScreenshotStart,
-      onUploadComplete: options?.onUploadComplete,
-      onError: options?.onError
-    };
-  }, [config, options]);
+  const optionsRef = useRef(options);
 
-  const configRef = useRef(getBaseConfig());
-  
-  // Keep config ref updated
+  // Keep options ref updated
   useEffect(() => {
-    configRef.current = getBaseConfig();
-  }, [getBaseConfig]);
+    optionsRef.current = options;
+  }, [options]);
 
-  // Format bytes helper
-  const formatBytes = (bytes: number): string => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  // Send notification helper
-  const sendUploadNotification = useCallback(async (success: boolean, message: string) => {
-    try {
-      let permissionGranted = await isPermissionGranted();
-      if (!permissionGranted) {
-        const permission = await requestPermission();
-        permissionGranted = permission === 'granted';
-      }
-
-      if (permissionGranted) {
-        sendNotification({
-          title: success ? 'Upload Successful!' : 'Upload Failed',
-          body: message,
-        });
-      }
-    } catch (error) {
-      console.error('Failed to send notification:', error);
-    }
-  }, []);
-
-  // Take screenshot with optional all-monitors flag
+  // Take screenshot - calls Rust backend
   const takeScreenshot = useCallback(async (captureAll: boolean = false) => {
-    if (isCapturingRef.current) {
-      console.log('Screenshot already in progress, skipping...');
+    if (isCapturingRef.current) return;
+
+    const opts = optionsRef.current;
+    if (!opts.enabled || !opts.uploadToken) {
+      console.log('Hotkeys disabled or no upload token');
       return;
     }
 
-    const currentConfig = configRef.current;
-    if (!currentConfig.uploadToken || !currentConfig.apiUrl) {
-      console.error('API token or API URL not configured');
-      await sendUploadNotification(false, 'Please sign in or configure your API settings');
-      return;
-    }
-
-    if (currentConfig.onScreenshotStart) {
-      currentConfig.onScreenshotStart();
-    }
-
+    opts.onScreenshotStart?.();
     isCapturingRef.current = true;
-    console.log(`Taking ${captureAll ? 'all monitors' : 'fullscreen'} screenshot...`);
 
     try {
+      // Let Rust handle everything
       const result = await invoke<UploadCompleteEvent>('screenshot_and_upload', {
-        uploadToken: currentConfig.uploadToken,
-        apiUrl: currentConfig.apiUrl,
-        visibility: currentConfig.visibility || 'PUBLIC',
-        captureAll: captureAll,
+        apiUrl: opts.apiUrl,
+        uploadToken: opts.uploadToken,
+        visibility: opts.visibility,
+        captureAll,
         monitorIndex: null,
       });
 
-      console.log('Screenshot result:', result);
-
       if (result.url) {
-        // Copy URL to clipboard
-        try {
-          await writeText(result.url);
-          console.log('URL copied to clipboard:', result.url);
-        } catch (clipboardError) {
-          console.error('Failed to copy to clipboard:', clipboardError);
-        }
+        // Copy to clipboard
+        await writeText(result.url).catch(console.error);
 
-        if (currentConfig.onUploadComplete) {
-          currentConfig.onUploadComplete(result);
-        }
+        // Notify user (fire and forget)
+        sendNotification({
+          title: 'Upload Complete',
+          body: 'URL copied to clipboard',
+        });
 
-        // Format file size if available
-        const sizeInfo = result.size ? ` (${formatBytes(result.size)})` : '';
-        await sendUploadNotification(true, `URL copied to clipboard${sizeInfo}\n${result.url}`);
-      } else {
-        const errorMessage = 'Unknown upload error occurred';
-        console.error('Upload failed:', errorMessage);
-        if (currentConfig.onError) {
-          currentConfig.onError(errorMessage);
-        }
-        await sendUploadNotification(false, errorMessage);
+        opts.onUploadComplete?.(result);
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error('Screenshot error:', errorMessage);
-      if (currentConfig.onError) {
-        currentConfig.onError(errorMessage);
-      }
-      await sendUploadNotification(false, errorMessage);
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error('Screenshot error:', msg);
+      opts.onError?.(msg);
     } finally {
       isCapturingRef.current = false;
     }
-  }, [sendUploadNotification]);
+  }, []);
 
-  // Screenshot functions
   const takeFullscreenScreenshot = useCallback(() => takeScreenshot(false), [takeScreenshot]);
   const takeAllMonitorsScreenshot = useCallback(() => takeScreenshot(true), [takeScreenshot]);
 
-  // Register hotkeys
-  useEffect(() => {
-    if (isLoading || !config) return;
+  // Upload whatever image is currently on the clipboard
+  const uploadClipboardImage = useCallback(async () => {
+    if (isCapturingRef.current) return;
 
-    const currentConfig = configRef.current;
+    const opts = optionsRef.current;
+    if (!opts.enabled || !opts.uploadToken) {
+      console.log('Hotkeys disabled or no upload token');
+      return;
+    }
+
+    opts.onScreenshotStart?.();
+    isCapturingRef.current = true;
+
+    try {
+      const response = await invoke<UploadResponse>('upload_clipboard_image', {
+        apiUrl: opts.apiUrl,
+        uploadToken: opts.uploadToken,
+        visibility: opts.visibility,
+        password: null,
+      });
+
+      if (response.url) {
+        await writeText(response.url).catch(console.error);
+
+        sendNotification({
+          title: 'Upload Complete',
+          body: 'URL copied to clipboard',
+        });
+
+        opts.onUploadComplete?.({
+          url: response.url,
+          name: response.name,
+          size: response.size,
+          file_type: response.type,
+          screenshot_path: null,
+        });
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error('Clipboard upload error:', msg);
+      opts.onError?.(msg);
+    } finally {
+      isCapturingRef.current = false;
+    }
+  }, []);
+
+  // Register hotkeys with delay
+  useEffect(() => {
+    // Skip if not in Tauri or not enabled
+    if (typeof window === 'undefined') return;
+    if (!(window as any).__TAURI_INTERNALS__) return;
+    if (!options.enabled) return;
+    if (!options.hotkeys) return;
+
+    let mounted = true;
 
     const registerHotkeys = async () => {
-      // Unregister any previously registered hotkeys
-      for (const hotkey of registeredHotkeysRef.current) {
+      // Wait for app to fully initialize
+      await new Promise(r => setTimeout(r, 1500));
+      if (!mounted) return;
+
+      // Cleanup old hotkeys
+      for (const hk of registeredHotkeysRef.current) {
         try {
-          const registered = await isRegistered(hotkey);
-          if (registered) {
-            await unregister(hotkey);
-            console.log(`Unregistered hotkey: ${hotkey}`);
-          }
-        } catch (error) {
-          console.error(`Failed to unregister hotkey ${hotkey}:`, error);
+          if (await isRegistered(hk)) await unregister(hk);
+        } catch (e) {
+          console.warn('Unregister failed:', hk);
         }
       }
       registeredHotkeysRef.current = [];
 
-      // Register fullscreen screenshot hotkey
-      if (currentConfig.hotkeys?.screenshotFullscreen) {
-        const hotkey = currentConfig.hotkeys.screenshotFullscreen;
+      // Register fullscreen hotkey
+      const fullscreenHk = options.hotkeys?.screenshotFullscreen;
+      if (fullscreenHk && mounted) {
         try {
-          const alreadyRegistered = await isRegistered(hotkey);
-          if (!alreadyRegistered) {
-            await register(hotkey, (event) => {
-              if (event.state === 'Pressed') {
-                console.log('Fullscreen screenshot hotkey pressed');
-                takeFullscreenScreenshot();
-              }
+          if (!(await isRegistered(fullscreenHk))) {
+            await register(fullscreenHk, (e) => {
+              if (e.state === 'Pressed') takeFullscreenScreenshot();
             });
-            registeredHotkeysRef.current.push(hotkey);
-            console.log(`Registered fullscreen hotkey: ${hotkey}`);
+            registeredHotkeysRef.current.push(fullscreenHk);
+            console.log('Registered:', fullscreenHk);
           }
-        } catch (error) {
-          console.error(`Failed to register fullscreen hotkey ${hotkey}:`, error);
+        } catch (e) {
+          console.error('Register failed:', fullscreenHk, e);
         }
       }
 
-      // Register all monitors screenshot hotkey
-      if (currentConfig.hotkeys?.screenshotAllMonitors) {
-        const hotkey = currentConfig.hotkeys.screenshotAllMonitors;
+      // Register all-monitors hotkey
+      const allMonitorsHk = options.hotkeys?.screenshotAllMonitors;
+      if (allMonitorsHk && mounted) {
         try {
-          const alreadyRegistered = await isRegistered(hotkey);
-          if (!alreadyRegistered) {
-            await register(hotkey, (event) => {
-              if (event.state === 'Pressed') {
-                console.log('All monitors screenshot hotkey pressed');
-                takeAllMonitorsScreenshot();
-              }
+          if (!(await isRegistered(allMonitorsHk))) {
+            await register(allMonitorsHk, (e) => {
+              if (e.state === 'Pressed') takeAllMonitorsScreenshot();
             });
-            registeredHotkeysRef.current.push(hotkey);
-            console.log(`Registered all monitors hotkey: ${hotkey}`);
+            registeredHotkeysRef.current.push(allMonitorsHk);
+            console.log('Registered:', allMonitorsHk);
           }
-        } catch (error) {
-          console.error(`Failed to register all monitors hotkey ${hotkey}:`, error);
+        } catch (e) {
+          console.error('Register failed:', allMonitorsHk, e);
+        }
+      }
+
+      // Register clipboard-upload hotkey
+      const clipboardHk = options.hotkeys?.uploadClipboard;
+      if (clipboardHk && mounted) {
+        try {
+          if (!(await isRegistered(clipboardHk))) {
+            await register(clipboardHk, (e) => {
+              if (e.state === 'Pressed') uploadClipboardImage();
+            });
+            registeredHotkeysRef.current.push(clipboardHk);
+            console.log('Registered:', clipboardHk);
+          }
+        } catch (e) {
+          console.error('Register failed:', clipboardHk, e);
         }
       }
     };
 
     registerHotkeys();
 
-    // Cleanup on unmount or config change
     return () => {
-      const cleanup = async () => {
-        for (const hotkey of registeredHotkeysRef.current) {
+      mounted = false;
+      // Cleanup
+      (async () => {
+        for (const hk of registeredHotkeysRef.current) {
           try {
-            const registered = await isRegistered(hotkey);
-            if (registered) {
-              await unregister(hotkey);
-              console.log(`Cleanup: Unregistered hotkey: ${hotkey}`);
-            }
-          } catch (error) {
-            console.error(`Cleanup: Failed to unregister hotkey ${hotkey}:`, error);
-          }
+            if (await isRegistered(hk)) await unregister(hk);
+          } catch { }
         }
         registeredHotkeysRef.current = [];
-      };
-      cleanup();
+      })();
     };
-  }, [isLoading, config, takeFullscreenScreenshot, takeAllMonitorsScreenshot]);
-
-  return {
+  }, [
+    options.enabled,
+    options.hotkeys?.screenshotFullscreen,
+    options.hotkeys?.screenshotAllMonitors,
+    options.hotkeys?.uploadClipboard,
     takeFullscreenScreenshot,
     takeAllMonitorsScreenshot,
-  };
+    uploadClipboardImage,
+  ]);
+
+  return { takeFullscreenScreenshot, takeAllMonitorsScreenshot, uploadClipboardImage };
 }

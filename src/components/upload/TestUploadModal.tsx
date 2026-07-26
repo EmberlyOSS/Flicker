@@ -9,7 +9,7 @@ interface TestUploadModalProps {
   localPath?: string
 }
 
-export function TestUploadModal({ isOpen, onClose, imageUrl, imageName, localPath }: TestUploadModalProps) {
+export function TestUploadModal({ isOpen, onClose, imageUrl, imageName }: TestUploadModalProps) {
   const [copied, setCopied] = useState(false)
   const [imageError, setImageError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)

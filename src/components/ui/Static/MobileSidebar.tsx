@@ -45,7 +45,7 @@ export function MobileSidebar({
   return (
     <>
       {/* Mobile Header */}
-      <header className="mobile-header glass-card border-b border-border/50">
+      <header className="mobile-header glass-elevated border-b border-border/40 rounded-none">
         <div className="flex items-center justify-between px-4 py-3">
           {/* Logo and branding */}
           <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -121,7 +121,7 @@ export function MobileSidebar({
 
       {/* Mobile Menu */}
       <nav
-        className={`mobile-menu glass-card border-b border-border/50 fixed left-0 right-0 top-[60px] z-40 lg:hidden overflow-y-auto transition-all duration-300 ${
+        className={`mobile-menu glass-elevated border-b border-border/40 rounded-none fixed left-0 right-0 top-[60px] z-40 lg:hidden overflow-y-auto transition-all duration-300 ${
           isOpen ? 'max-h-[80vh] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
         }`}
       >

@@ -28,7 +28,7 @@ export function Sidebar({
   showLogout = true,
 }: SidebarProps) {
   return (
-    <aside className="desktop-sidebar glass-card border-r border-border/50 flex flex-col h-screen sticky top-0">
+    <aside className="desktop-sidebar glass-elevated border-r border-border/40 flex flex-col h-screen sticky top-0 rounded-none">
       {/* Header */}
       <div className="p-4 border-b border-border/30">
         <div className="flex items-center gap-3">

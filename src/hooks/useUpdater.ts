@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import { check } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
+import { invoke } from '@tauri-apps/api/core'
 import { APP_VERSION } from '../constants'
 
 export interface UpdateInfo {
@@ -25,6 +26,14 @@ export function useUpdater() {
       const update = await check()
       
       if (update) {
+        // Log successful check
+        await invoke('log_event', {
+          eventType: 'update_check',
+          message: `Update available: ${update.version}`,
+          level: 'info',
+          metadata: { version: update.version }
+        }).catch(() => {}) // Silently fail if logging not available
+        
         setUpdateInfo({
           available: true,
           version: update.version,
@@ -37,8 +46,17 @@ export function useUpdater() {
         return null
       }
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      
+      // Log error to audit
+      await invoke('log_event', {
+        eventType: 'update_check',
+        message: `Update check failed: ${errorMsg}`,
+        level: 'error',
+        metadata: { error: errorMsg }
+      }).catch(() => {}) // Silently fail if logging not available
+      
       console.error('Update check failed:', error)
-      // Don't show error to user for update checks - just silently fail
       setUpdateInfo({ available: false })
       return null
     } finally {
@@ -52,6 +70,14 @@ export function useUpdater() {
       if (!update) return
 
       setUpdateInfo(prev => ({ ...prev, downloading: true, progress: 0 }))
+
+      // Log download started
+      await invoke('log_event', {
+        eventType: 'update_download',
+        message: `Downloading update: ${update.version}`,
+        level: 'info',
+        metadata: { version: update.version }
+      }).catch(() => {})
 
       // Track download progress
       let downloaded = 0
@@ -77,14 +103,32 @@ export function useUpdater() {
         }
       })
 
+      // Log successful download
+      await invoke('log_event', {
+        eventType: 'update_installed',
+        message: `Update ${update.version} installed, relaunching...`,
+        level: 'info',
+        metadata: { version: update.version }
+      }).catch(() => {})
+
       // Relaunch the app
       await relaunch()
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      
+      // Log error
+      await invoke('log_event', {
+        eventType: 'update_error',
+        message: `Update failed: ${errorMsg}`,
+        level: 'error',
+        metadata: { error: errorMsg }
+      }).catch(() => {})
+      
       console.error('Update failed:', error)
       setUpdateInfo(prev => ({
         ...prev,
         downloading: false,
-        error: error instanceof Error ? error.message : 'Update failed',
+        error: errorMsg,
       }))
     }
   }, [])
