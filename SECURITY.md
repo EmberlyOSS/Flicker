@@ -20,7 +20,7 @@ We will acknowledge reports within 48 hours and provide an estimated timeline fo
 
 ## Scope
 
-This policy covers the `uploader` (Flicker) desktop application and its associated backend endpoints and APIs managed in this repository.
+This policy covers the Flicker desktop application and its associated backend endpoints and APIs managed in this repository.
 
 ## Supported Versions
 

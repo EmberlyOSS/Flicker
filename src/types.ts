@@ -3,6 +3,7 @@ export interface AppConfig {
   uploadUrl?: string
   visibility: 'PUBLIC' | 'PRIVATE'
   password?: string
+  preferredDomain?: string
   autoUpload: boolean
   defaultNotification: boolean
   // User data from login
@@ -93,10 +94,93 @@ export interface LoginResponse {
 }
 
 export interface UploadResponse {
+  id?: string
   url: string
   name: string
   size: number // Size in bytes
   type: string // MIME type
+}
+
+export interface UserProfile {
+  id: string
+  name: string | null
+  email: string
+  image: string | null
+  urlId: string
+}
+
+export interface DomainInfo {
+  id: string
+  domain: string
+  verified: boolean
+  isPrimary: boolean
+  cfStatus: string | null
+}
+
+export interface DomainLimit {
+  allowed: number | null
+  base: number
+  purchased: number
+  perkBonus: number
+  used: number
+  remaining: number | null
+  unlimited: boolean
+}
+
+export interface DomainsResponse {
+  domains: DomainInfo[]
+  domainLimit: DomainLimit
+}
+
+export interface PerksResponse {
+  perks: unknown[]
+  summary: {
+    activePerks: number
+    totalPerks: number
+    bonuses: {
+      storage: string | null
+      domains: string | null
+    }
+  }
+}
+
+export interface ShortenedUrlResponse {
+  id: string
+  shortCode: string
+  targetUrl: string
+  clicks: number
+  createdAt: string
+}
+
+export interface RecentUpload {
+  id: string
+  name: string
+  size: number
+  uploadedAt: string
+  views: number
+  downloads: number
+}
+
+export interface AnalyticsSummary {
+  plan: string
+  basic: {
+    totalFiles: number
+    storageUsed: number
+    totalUrls: number
+    totalUrlClicks: number
+    totalViews: number
+    totalDownloads: number
+    domainsCount: number
+    verifiedDomains: number
+  }
+  allowed: {
+    topFiles: boolean
+    topUrls: boolean
+    recentUploads: boolean
+    detailedList: boolean
+  }
+  recentUploads: RecentUpload[]
+  uploadsPerDay: { date: string; count: number }[]
 }
 
 export interface ScreenshotResult {
@@ -106,6 +190,7 @@ export interface ScreenshotResult {
 }
 
 export interface UploadCompleteEvent {
+  id?: string
   url: string
   name: string
   size: number
@@ -144,6 +229,7 @@ export interface UploadHistoryItem {
   fileType?: string
   size?: number
   thumbnailUrl?: string
+  fileId?: string
 }
 
 // ============================================================================

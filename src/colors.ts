@@ -1,5 +1,5 @@
 /**
- * Emberly Color System - Extracted from main website theme system
+ * Flicker Color System - Based on the main website theme system
  * Uses HSL format: "hue saturation% lightness%"
  * All colors are CSS variables that get injected into :root
  */

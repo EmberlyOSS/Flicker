@@ -1,6 +1,6 @@
 [package]
 name = "flicker"
-version = "0.2.0"
+version = "0.3.0"
 description = "Flicker - Screenshot & Upload Tool for Emberly"
 authors = ["CodeMeAPixel"]
 edition = "2021"

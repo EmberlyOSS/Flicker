@@ -4,9 +4,9 @@
 
 ![App Preview](./public/preview.png)
 
-**A ShareX-style desktop screenshot and file uploader for [Emberly](https://embrly.ca)**
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Early Access](https://img.shields.io/badge/status-early%20access-orange.svg)](https://github.com/EmberlyOSS/Flicker/releases)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Us-7289da?logo=discord&logoColor=white)](https://embrly.ca/discord)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](https://github.com/EmberlyOSS/Flicker)
 
@@ -147,7 +147,7 @@ Please read the [Code of Conduct](CODE_OF_CONDUCT.md) before participating in th
 
 ## License
 
-Licensed under the MIT License. See [LICENSE](LICENSE) for details.
+Licensed under the GNU Affero General Public License v3.0. See [LICENSE](LICENSE) for details.
 
 ## Links
 

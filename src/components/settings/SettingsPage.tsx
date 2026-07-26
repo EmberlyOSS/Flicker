@@ -14,7 +14,7 @@ import { APP_NAME, APP_VERSION, API_URL } from '../../constants'
 import { UpdateInfo } from '../../hooks/useUpdater'
 import { invoke } from '@tauri-apps/api/core'
 import { TestUploadModal } from '../upload/TestUploadModal'
-import { UploadResponse } from '../../types'
+import { UploadResponse, DomainsResponse, PerksResponse } from '../../types'
 import { useSounds } from '../../hooks/useSounds'
 import { saveAppearance } from '../../hooks/useAppearance'
 import { AuditLogPanel, DeviceInfoPanel } from '../debug'
@@ -131,6 +131,36 @@ export function SettingsPage({
   // Test Connection State
   const [isTesting, setIsTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ url: string; name: string; localPath?: string } | null>(null)
+
+  // Custom domains (for the upload-domain picker) and perk bonuses
+  const [domains, setDomains] = useState<DomainsResponse | null>(null)
+  const [domainsLoaded, setDomainsLoaded] = useState(false)
+  const [perks, setPerks] = useState<PerksResponse | null>(null)
+  const [perksLoaded, setPerksLoaded] = useState(false)
+
+  useEffect(() => {
+    if (activeTab === 'capture' && !domainsLoaded && config.uploadToken) {
+      setDomainsLoaded(true)
+      invoke<DomainsResponse>('emberly_get_domains', {
+        apiUrl: config.uploadUrl || API_URL,
+        token: config.uploadToken,
+      })
+        .then(setDomains)
+        .catch((err) => console.error('Failed to load domains:', err))
+    }
+  }, [activeTab, domainsLoaded, config.uploadToken, config.uploadUrl])
+
+  useEffect(() => {
+    if (activeTab === 'account' && !perksLoaded && config.uploadToken) {
+      setPerksLoaded(true)
+      invoke<PerksResponse>('emberly_get_perks', {
+        apiUrl: config.uploadUrl || API_URL,
+        token: config.uploadToken,
+      })
+        .then(setPerks)
+        .catch((err) => console.error('Failed to load perks:', err))
+    }
+  }, [activeTab, perksLoaded, config.uploadToken, config.uploadUrl])
 
   const { currentTheme, switchTheme, presets } = useTheme()
   const { preferences: soundPrefs, savePreferences, playUploadSuccess, playUploadError, playCopyLink, playSettingsSave, loaded: soundsLoaded } = useSounds()
@@ -386,6 +416,24 @@ export function SettingsPage({
                 </button>
               </div>
             </SettingsSection>
+
+            {perks && perks.summary.activePerks > 0 && (
+              <SettingsSection icon={Heart} title="Perks" description="Bonuses from your Emberly account">
+                <div className="p-4 space-y-2 glass-card">
+                  <p className="text-sm text-foreground">
+                    {perks.summary.activePerks} active perk{perks.summary.activePerks !== 1 ? 's' : ''}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {perks.summary.bonuses.storage && (
+                      <span className="badge">{perks.summary.bonuses.storage} storage</span>
+                    )}
+                    {perks.summary.bonuses.domains && (
+                      <span className="badge">{perks.summary.bonuses.domains} domains</span>
+                    )}
+                  </div>
+                </div>
+              </SettingsSection>
+            )}
           </div>
         )}
 
@@ -497,6 +545,26 @@ export function SettingsPage({
                     placeholder="Leave blank for no password"
                     className="w-full px-4 py-2.5 bg-secondary/50 border border-border/50 rounded-xl text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
                   />
+                </div>
+
+                {/* Upload Domain */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Upload Domain</label>
+                  <select
+                    value={formData.preferredDomain || ''}
+                    onChange={(e) => handleChange('preferredDomain', e.target.value || undefined)}
+                    className="w-full px-4 py-2.5 bg-secondary/50 border border-border/50 rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  >
+                    <option value="">Default (embrly.ca)</option>
+                    {domains?.domains.filter(d => d.verified).map(d => (
+                      <option key={d.id} value={d.domain}>{d.domain}</option>
+                    ))}
+                  </select>
+                  {domainsLoaded && domains && domains.domains.filter(d => d.verified).length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      No verified custom domains yet — add one at embrly.ca/dashboard/domains.
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">

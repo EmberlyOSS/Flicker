@@ -11,7 +11,6 @@ export function initializeAuditLogging() {
   if (isInitialized) return
   isInitialized = true
 
-  // Intercept console.error
   const originalError = console.error
   console.error = (...args: any[]) => {
     originalError(...args)
@@ -21,7 +20,6 @@ export function initializeAuditLogging() {
     logToAudit('console_error', message, 'error')
   }
 
-  // Intercept console.warn
   const originalWarn = console.warn
   console.warn = (...args: any[]) => {
     originalWarn(...args)
@@ -31,7 +29,6 @@ export function initializeAuditLogging() {
     logToAudit('console_warn', message, 'warning')
   }
 
-  // Catch unhandled promise rejections
   window.addEventListener('unhandledrejection', event => {
     const reason = event.reason
     const message = typeof reason === 'object' ? JSON.stringify(reason) : String(reason)
@@ -41,7 +38,6 @@ export function initializeAuditLogging() {
     })
   })
 
-  // Catch global errors
   window.addEventListener('error', event => {
     const message = event.message || event.type
     logToAudit('global_error', `${event.filename}:${event.lineno} - ${message}`, 'error', {
@@ -52,7 +48,6 @@ export function initializeAuditLogging() {
     })
   })
 
-  // Intercept fetch errors (network issues)
   const originalFetch = window.fetch
   window.fetch = function (...args: any[]) {
     const url = typeof args[0] === 'string' ? args[0] : args[0]?.url || 'unknown'
@@ -65,7 +60,6 @@ export function initializeAuditLogging() {
     })
   }
 
-  // Track major lifecycle events
   logToAudit('app_init', 'Application initialized', 'info')
 
   window.addEventListener('beforeunload', () => {
@@ -73,17 +67,13 @@ export function initializeAuditLogging() {
   })
 }
 
-/**
- * Log an event to the audit system
- * Silently fails if Tauri is not available (e.g., in tests or web mode)
- */
+
 function logToAudit(
   eventType: string,
   message: string,
   level: 'info' | 'warning' | 'error',
   metadata?: Record<string, any>
 ) {
-  // Only log if we're in Tauri environment
   if (!(window as any).__TAURI_INTERNALS__) {
     return
   }
@@ -93,14 +83,9 @@ function logToAudit(
     message,
     level,
     metadata: metadata || null,
-  }).catch(() => {
-    // Silently fail - don't want to create infinite loops
-  })
+  }).catch(() => {})
 }
 
-/**
- * Manually log an event to the audit system
- */
 export async function logEvent(
   eventType: string,
   message: string,

@@ -12,6 +12,7 @@ pub async fn upload_file(
     upload_token: String,
     visibility: String,
     password: Option<String>,
+    domain: Option<String>,
     on_progress: Option<Box<dyn Fn(u64, u64) + Send + Sync>>,
 ) -> Result<UploadResponse, String> {
     // Validate inputs
@@ -21,11 +22,12 @@ pub async fn upload_file(
     // Create API client and upload
     let client = EmberlyCient::new(api_url);
     let api_response = client
-        .upload_file(&upload_token, &file_path, &visibility, password, on_progress)
+        .upload_file(&upload_token, &file_path, &visibility, password, domain, on_progress)
         .await?;
-    
+
     // Convert API response to our UploadResponse type
     Ok(UploadResponse {
+        id: api_response.id,
         url: api_response.url,
         name: api_response.name,
         size: api_response.size,
@@ -39,6 +41,7 @@ pub fn create_upload_event(
     screenshot_path: Option<String>,
 ) -> UploadCompleteEvent {
     UploadCompleteEvent {
+        id: response.id,
         url: response.url,
         name: response.name,
         size: response.size,

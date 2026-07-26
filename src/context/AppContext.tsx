@@ -1,11 +1,12 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 import { AppConfig, UploadResponse, LoginResponse, UploadHistoryItem, UploadCompleteEvent } from '../types'
 import { loadConfig, saveConfig, loadUploadHistory, saveUploadHistory, addToUploadHistory } from '../config'
 import { useHotkeys } from '../hooks/useHotkeys'
 import { useNotifications } from '../hooks/useNotifications'
 import { DEFAULT_HOTKEYS } from '../config'
 
-export type PageId = 'upload' | 'history' | 'settings' | 'analytics'
+export type PageId = 'upload' | 'history' | 'settings' | 'analytics' | 'shorten'
 
 interface AppContextValue {
     // Config
@@ -52,6 +53,13 @@ interface AppProviderProps {
     children: ReactNode
 }
 
+/**
+ * AppProvider component that wraps the application and provides global state and context.
+ * It manages configuration, authentication, upload history, navigation, screenshot functionality, and notifications.
+ * 
+ * @param {AppProviderProps} props - The properties for the AppProvider component.
+ * @returns {JSX.Element} The AppProvider component that wraps its children with the AppContext.
+ */
 export function AppProvider({ children }: AppProviderProps) {
     const [config, setConfig] = useState<AppConfig | null>(null)
     const [history, setHistory] = useState<UploadHistoryItem[]>([])
@@ -59,10 +67,8 @@ export function AppProvider({ children }: AppProviderProps) {
     const [activePage, setActivePage] = useState<PageId>('upload')
     const [screenshotStatus, setScreenshotStatus] = useState<string | null>(null)
 
-    // Notifications hook
     const notifications = useNotifications()
 
-    // Load initial config and history
     useEffect(() => {
         try {
             const loadedConfig = loadConfig()
@@ -113,29 +119,42 @@ export function AppProvider({ children }: AppProviderProps) {
     }, [config])
 
     const handleUploadComplete = useCallback((_filePath: string, response: UploadResponse) => {
-        addToUploadHistory(response.url, response.name)
+        addToUploadHistory(response.url, response.name, response.type, response.size, undefined, response.id)
         setHistory(loadUploadHistory())
         notifications.notifyUpload('Upload Complete', `${response.name} uploaded successfully`, response.url)
     }, [notifications])
 
-    const handleDeleteFromHistory = useCallback((url: string) => {
-        const updatedHistory = history.filter(item => item.url !== url)
+    const handleDeleteFromHistory = useCallback(async (url: string) => {
+        const item = history.find(h => h.url === url)
+
+        if (item?.fileId && config?.uploadToken) {
+            try {
+                await invoke('emberly_delete_file', {
+                    apiUrl: config.uploadUrl || 'https://embrly.ca',
+                    token: config.uploadToken,
+                    fileId: item.fileId,
+                })
+            } catch (error) {
+                console.error('Failed to delete file from server:', error)
+            }
+        }
+
+        const updatedHistory = history.filter(h => h.url !== url)
         setHistory(updatedHistory)
         saveUploadHistory(updatedHistory)
-    }, [history])
+    }, [history, config])
 
     const handleCopyUrl = useCallback((url: string) => {
         navigator.clipboard.writeText(url)
     }, [])
 
-    // Hotkey callbacks
     const handleScreenshotStart = useCallback(() => {
         setScreenshotStatus('Capturing...')
     }, [])
 
     const handleScreenshotHotkeyComplete = useCallback((result: UploadCompleteEvent) => {
         setScreenshotStatus(null)
-        addToUploadHistory(result.url, result.name)
+        addToUploadHistory(result.url, result.name, result.file_type, result.size, undefined, result.id)
         setHistory(loadUploadHistory())
         notifications.notifyUpload('Screenshot Uploaded', result.name, result.url)
     }, [notifications])
@@ -146,12 +165,12 @@ export function AppProvider({ children }: AppProviderProps) {
         notifications.notifyError('Screenshot Failed', error)
     }, [notifications])
 
-    // Initialize hotkeys
     const { takeFullscreenScreenshot, takeAllMonitorsScreenshot } = useHotkeys({
         hotkeys: config?.hotkeys || DEFAULT_HOTKEYS,
         uploadToken: config?.uploadToken || '',
         visibility: config?.visibility || 'PUBLIC',
         apiUrl: config?.uploadUrl || 'https://embrly.ca',
+        domain: config?.preferredDomain,
         enabled: !!config?.uploadToken,
         onScreenshotStart: handleScreenshotStart,
         onUploadComplete: handleScreenshotHotkeyComplete,

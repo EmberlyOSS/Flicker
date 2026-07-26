@@ -77,6 +77,7 @@ async fn upload_file(
     upload_token: String,
     visibility: String,
     password: Option<String>,
+    domain: Option<String>,
 ) -> Result<UploadResponse, String> {
     let progress_path = file_path.clone();
     let progress_window = window.clone();
@@ -100,6 +101,7 @@ async fn upload_file(
         upload_token,
         visibility,
         password,
+        domain,
         Some(Box::new(on_progress)),
     )
     .await?;
@@ -122,6 +124,7 @@ async fn upload_clipboard_image(
     upload_token: String,
     visibility: String,
     password: Option<String>,
+    domain: Option<String>,
 ) -> Result<UploadResponse, String> {
     use tauri_plugin_clipboard_manager::ClipboardExt;
 
@@ -150,6 +153,7 @@ async fn upload_clipboard_image(
         upload_token,
         visibility,
         password,
+        domain,
         None,
     )
     .await?;
@@ -169,6 +173,7 @@ async fn screenshot_and_upload(
     visibility: String,
     monitor_index: Option<usize>,
     capture_all: Option<bool>,
+    domain: Option<String>,
 ) -> Result<UploadCompleteEvent, String> {
     // Emit that we're starting
     desktop::app::emit_event(&window, "screenshot_started", serde_json::json!({}));
@@ -189,6 +194,7 @@ async fn screenshot_and_upload(
         upload_token,
         visibility,
         None,
+        domain,
         None,
     ).await?;
     
@@ -375,9 +381,9 @@ async fn emberly_upload_file(
 ) -> Result<serde_json::Value, String> {
     let client = common::EmberlyCient::new(api_url);
     let response = client
-        .upload_file(&token, &file_path, &visibility, password, None)
+        .upload_file(&token, &file_path, &visibility, password, None, None)
         .await?;
-    
+
     Ok(serde_json::to_value(response)
         .map_err(|e| format!("Failed to serialize upload response: {}", e))?)
 }
@@ -389,7 +395,74 @@ async fn emberly_get_stats(
     token: String,
 ) -> Result<serde_json::Value, String> {
     let client = common::EmberlyCient::new(api_url);
-    client.get_stats(&token).await
+    let stats = client.get_stats(&token).await?;
+
+    Ok(serde_json::to_value(stats)
+        .map_err(|e| format!("Failed to serialize stats: {}", e))?)
+}
+
+/// Delete a file from Emberly
+#[tauri::command]
+async fn emberly_delete_file(
+    api_url: String,
+    token: String,
+    file_id: String,
+) -> Result<(), String> {
+    let client = common::EmberlyCient::new(api_url);
+    client.delete_file(&token, &file_id).await
+}
+
+/// Get the user's custom domains and domain-slot usage
+#[tauri::command]
+async fn emberly_get_domains(
+    api_url: String,
+    token: String,
+) -> Result<serde_json::Value, String> {
+    let client = common::EmberlyCient::new(api_url);
+    let domains = client.get_domains(&token).await?;
+
+    Ok(serde_json::to_value(domains)
+        .map_err(|e| format!("Failed to serialize domains: {}", e))?)
+}
+
+/// Get the user's active perk bonuses
+#[tauri::command]
+async fn emberly_get_perks(
+    api_url: String,
+    token: String,
+) -> Result<serde_json::Value, String> {
+    let client = common::EmberlyCient::new(api_url);
+    let perks = client.get_perks(&token).await?;
+
+    Ok(serde_json::to_value(perks)
+        .map_err(|e| format!("Failed to serialize perks: {}", e))?)
+}
+
+/// Shorten a URL via the Emberly URL shortener
+#[tauri::command]
+async fn emberly_shorten_url(
+    api_url: String,
+    token: String,
+    url: String,
+) -> Result<serde_json::Value, String> {
+    let client = common::EmberlyCient::new(api_url);
+    let shortened = client.shorten_url(&token, &url).await?;
+
+    Ok(serde_json::to_value(shortened)
+        .map_err(|e| format!("Failed to serialize shortened url: {}", e))?)
+}
+
+/// Update a file's visibility and/or password
+#[tauri::command]
+async fn emberly_update_file(
+    api_url: String,
+    token: String,
+    file_id: String,
+    visibility: Option<String>,
+    password: Option<String>,
+) -> Result<(), String> {
+    let client = common::EmberlyCient::new(api_url);
+    client.update_file(&token, &file_id, visibility, password).await
 }
 
 /// Get device information for support/diagnostics
@@ -567,6 +640,11 @@ pub fn run() {
             emberly_validate_token,
             emberly_upload_file,
             emberly_get_stats,
+            emberly_delete_file,
+            emberly_get_domains,
+            emberly_get_perks,
+            emberly_shorten_url,
+            emberly_update_file,
             get_device_info,
             get_audit_logs,
             get_audit_logs_with_device,

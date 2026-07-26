@@ -6,6 +6,9 @@ export interface AdminCheckResult {
   checkComplete: boolean
 }
 
+/**
+ * 
+ */
 export function useAdminCheck() {
   const [adminStatus, setAdminStatus] = useState<AdminCheckResult>({
     isAdmin: false,
@@ -14,13 +17,11 @@ export function useAdminCheck() {
   const [showAdminPrompt, setShowAdminPrompt] = useState(false)
 
   useEffect(() => {
-    // Only check admin status in Tauri environment
     if (!(window as any).__TAURI_INTERNALS__) {
       setAdminStatus({ isAdmin: true, checkComplete: true })
       return
     }
 
-    // Use a small delay to prevent blocking the initial render
     const timer = setTimeout(() => {
       invoke<boolean>('is_admin')
         .then((result) => {
@@ -41,7 +42,6 @@ export function useAdminCheck() {
       return
     }
 
-    // Fire and forget - don't await
     invoke('request_admin_elevation').catch((error) => {
       console.error('Failed to request admin elevation:', error)
     })

@@ -18,16 +18,12 @@ function getAudioContext(): AudioContext {
   return audioState.ctx
 }
 
-/**
- * Play a success sound - ascending tones
- */
 export function playSuccessSound() {
   try {
     const ctx = getAudioContext()
     const now = ctx.currentTime
 
-    // Create three ascending notes
-    const notes = [523.25, 659.25, 783.99] // C5, E5, G5
+    const notes = [523.25, 659.25, 783.99]
     const duration = 0.15
 
     notes.forEach((freq, index) => {
@@ -51,16 +47,12 @@ export function playSuccessSound() {
   }
 }
 
-/**
- * Play an error sound - descending tones
- */
 export function playErrorSound() {
   try {
     const ctx = getAudioContext()
     const now = ctx.currentTime
 
-    // Create two descending notes
-    const notes = [523.25, 330.0] // C5, E4
+    const notes = [523.25, 330.0]
     const duration = 0.2
 
     notes.forEach((freq, index) => {
@@ -84,9 +76,6 @@ export function playErrorSound() {
   }
 }
 
-/**
- * Play a copy/notification sound - bright single tone
- */
 export function playCopySound() {
   try {
     const ctx = getAudioContext()
@@ -112,9 +101,6 @@ export function playCopySound() {
   }
 }
 
-/**
- * Play a subtle click sound - two quick tones
- */
 export function playClickSound() {
   try {
     const ctx = getAudioContext()
@@ -142,17 +128,14 @@ export function playClickSound() {
   }
 }
 
-/**
- * Play notification/alert sound - three tones
- */
 export function playNotificationSound() {
   try {
     const ctx = getAudioContext()
     const now = ctx.currentTime
     const duration = 0.12
 
-    const notes = [659.25, 659.25, 783.99] // E5, E5, G5
-    const timing = [0, 150, 100] // ms
+    const notes = [659.25, 659.25, 783.99]
+    const timing = [0, 150, 100]
 
     let currentTime = 0
     notes.forEach((freq, index) => {

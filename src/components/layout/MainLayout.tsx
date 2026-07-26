@@ -1,5 +1,5 @@
 import { ReactNode } from 'react'
-import { Upload, History, BarChart3 } from 'lucide-react'
+import { Upload, History, BarChart3, Link2 } from 'lucide-react'
 import { Sidebar, NavItem } from '../ui/Static/Sidebar'
 import { MobileSidebar } from '../ui/Static/MobileSidebar'
 import { Header } from './Header'
@@ -15,6 +15,7 @@ export function MainLayout({ children }: MainLayoutProps) {
     const navItems: NavItem[] = [
         { id: 'upload', label: 'Upload', icon: <Upload size={20} /> },
         { id: 'history', label: 'History', icon: <History size={20} />, badge: history.length > 0 ? history.length : undefined },
+        { id: 'shorten', label: 'Shorten', icon: <Link2 size={20} /> },
         { id: 'analytics', label: 'Stats', icon: <BarChart3 size={20} /> },
     ]
 
