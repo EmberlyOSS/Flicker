@@ -32,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `.github/workflows/release.yml`: a GitHub Actions matrix build
   (Windows, macOS arm64/x64, Ubuntu 22.04) that builds and drafts a GitHub
   Release via `tauri-action` on every `flicker-v*` tag.
+- Added GitHub issue templates: bug report, feature request, and beta
+  testing feedback, plus an issue template chooser linking to Discord for
+  general questions. (The README already linked to `bug_report.md`/
+  `feature_request.md`; the templates themselves didn't exist until now.)
 
 ### Changed
 - Refreshed the visual design system to match the current embrly.ca styling:
