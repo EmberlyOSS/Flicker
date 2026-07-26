@@ -45,7 +45,9 @@ pub struct LoginUser {
     pub url_id: String,
 }
 
-/// User profile information
+/// User profile information (subset of `GET /api/profile`'s response —
+/// that endpoint also returns embedded `files`/`shortenedUrls` arrays we
+/// don't need here and intentionally leave untyped so serde ignores them).
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct UserProfile {
     pub id: String,
@@ -54,18 +56,164 @@ pub struct UserProfile {
     pub image: Option<String>,
     #[serde(rename = "urlId")]
     pub url_id: String,
-    #[serde(rename = "uploadToken")]
-    pub upload_token: String,
+}
+
+/// Envelope used by endpoints that wrap their payload as `{ success, data }`
+/// (e.g. `/api/profile`, `/api/urls`).
+#[derive(Debug, Deserialize)]
+struct DataEnvelope<T> {
+    data: T,
 }
 
 /// File upload response
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct UploadResponse {
+    /// The uploaded file's database id. Optional for resilience against
+    /// older server versions or transitional deploys — always present on a
+    /// current server.
+    pub id: Option<String>,
     pub url: String,
     pub name: String,
     pub size: u64,
     #[serde(rename = "type")]
     pub file_type: String,
+}
+
+/// A single custom domain (`GET /api/domains`)
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct DomainInfo {
+    pub id: String,
+    pub domain: String,
+    pub verified: bool,
+    #[serde(rename = "isPrimary")]
+    pub is_primary: bool,
+    #[serde(rename = "cfStatus")]
+    pub cf_status: Option<String>,
+}
+
+/// Domain slot usage/limits, embedded in the `/api/domains` response
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct DomainLimit {
+    pub allowed: Option<u32>,
+    pub base: u32,
+    pub purchased: u32,
+    #[serde(rename = "perkBonus")]
+    pub perk_bonus: u32,
+    pub used: u32,
+    pub remaining: Option<u32>,
+    pub unlimited: bool,
+}
+
+/// `GET /api/domains` response (returned as a raw object, not wrapped in
+/// `{success, data}` — confirmed against the actual route handler).
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct DomainsResponse {
+    pub domains: Vec<DomainInfo>,
+    #[serde(rename = "domainLimit")]
+    pub domain_limit: DomainLimit,
+}
+
+/// Perk bonus summary fields (`GET /api/profile/perks`)
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct PerkBonuses {
+    pub storage: Option<String>,
+    pub domains: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct PerksSummary {
+    #[serde(rename = "activePerks")]
+    pub active_perks: u32,
+    #[serde(rename = "totalPerks")]
+    pub total_perks: u32,
+    pub bonuses: PerkBonuses,
+}
+
+/// `GET /api/profile/perks` response (raw object, not `{success, data}`).
+/// Individual perk entries vary in shape by perk type, so they're left as
+/// loosely-typed JSON values — only the summary is rendered in Settings.
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct PerksResponse {
+    pub perks: Vec<serde_json::Value>,
+    pub summary: PerksSummary,
+}
+
+/// A shortened URL (`POST`/`GET /api/urls`)
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ShortenedUrlResponse {
+    pub id: String,
+    #[serde(rename = "shortCode")]
+    pub short_code: String,
+    #[serde(rename = "targetUrl")]
+    pub target_url: String,
+    pub clicks: u32,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+}
+
+/// Basic usage aggregates embedded in `/api/analytics/summary`
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct AnalyticsBasic {
+    #[serde(rename = "totalFiles")]
+    pub total_files: u64,
+    #[serde(rename = "storageUsed")]
+    pub storage_used: u64,
+    #[serde(rename = "totalUrls")]
+    pub total_urls: u64,
+    #[serde(rename = "totalUrlClicks")]
+    pub total_url_clicks: u64,
+    #[serde(rename = "totalViews")]
+    pub total_views: u64,
+    #[serde(rename = "totalDownloads")]
+    pub total_downloads: u64,
+    #[serde(rename = "domainsCount")]
+    pub domains_count: u64,
+    #[serde(rename = "verifiedDomains")]
+    pub verified_domains: u64,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct AnalyticsAllowed {
+    #[serde(rename = "topFiles")]
+    pub top_files: bool,
+    #[serde(rename = "topUrls")]
+    pub top_urls: bool,
+    #[serde(rename = "recentUploads")]
+    pub recent_uploads: bool,
+    #[serde(rename = "detailedList")]
+    pub detailed_list: bool,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct RecentUpload {
+    pub id: String,
+    pub name: String,
+    pub size: u64,
+    #[serde(rename = "uploadedAt")]
+    pub uploaded_at: String,
+    pub views: u64,
+    pub downloads: u64,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct UploadsPerDay {
+    pub date: String,
+    pub count: u64,
+}
+
+/// `GET /api/analytics/summary` response (raw object, not `{success, data}`).
+/// The server also includes plan-gated extra lists (`topFiles`,
+/// `topStorageFiles`, `topUrls`, `files`) that aren't modeled here — serde
+/// ignores unknown fields by default, and the Stats page MVP doesn't need them.
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct AnalyticsSummary {
+    pub plan: String,
+    pub basic: AnalyticsBasic,
+    pub allowed: AnalyticsAllowed,
+    #[serde(rename = "recentUploads", default)]
+    pub recent_uploads: Vec<RecentUpload>,
+    #[serde(rename = "uploadsPerDay", default)]
+    pub uploads_per_day: Vec<UploadsPerDay>,
 }
 
 /// API error response
@@ -129,7 +277,7 @@ impl EmberlyCient {
 
     /// Get user profile information
     pub async fn get_profile(&self, token: &str) -> Result<UserProfile, String> {
-        let url = format!("{}/api/users/profile", self.base_url);
+        let url = format!("{}/api/profile", self.base_url);
 
         let response = self
             .client
@@ -147,15 +295,24 @@ impl EmberlyCient {
             ));
         }
 
-        response
-            .json::<UserProfile>()
+        let envelope = response
+            .json::<DataEnvelope<UserProfile>>()
             .await
-            .map_err(|e| format!("Failed to parse profile response: {}", e))
+            .map_err(|e| format!("Failed to parse profile response: {}", e))?;
+
+        Ok(envelope.data)
     }
 
-    /// Validate an upload token
+    /// Validate an upload token. There's no dedicated validation endpoint on
+    /// the server, so this just checks whether the token can successfully
+    /// fetch the profile it authenticates.
     pub async fn validate_token(&self, token: &str) -> Result<bool, String> {
-        let url = format!("{}/api/auth/validate", self.base_url);
+        Ok(self.get_profile(token).await.is_ok())
+    }
+
+    /// Get the user's custom domains and domain-slot usage
+    pub async fn get_domains(&self, token: &str) -> Result<DomainsResponse, String> {
+        let url = format!("{}/api/domains", self.base_url);
 
         let response = self
             .client
@@ -163,9 +320,117 @@ impl EmberlyCient {
             .header("Authorization", format!("Bearer {}", token))
             .send()
             .await
-            .map_err(|e| format!("Token validation failed: {}", e))?;
+            .map_err(|e| format!("Domains request failed: {}", e))?;
 
-        Ok(response.status().is_success())
+        if !response.status().is_success() {
+            return Err(format!(
+                "Failed to get domains with status {}: {}",
+                response.status(),
+                response.text().await.unwrap_or_default()
+            ));
+        }
+
+        response
+            .json::<DomainsResponse>()
+            .await
+            .map_err(|e| format!("Failed to parse domains response: {}", e))
+    }
+
+    /// Get the user's active perk bonuses (Discord booster / GitHub contributor)
+    pub async fn get_perks(&self, token: &str) -> Result<PerksResponse, String> {
+        let url = format!("{}/api/profile/perks", self.base_url);
+
+        let response = self
+            .client
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", token))
+            .send()
+            .await
+            .map_err(|e| format!("Perks request failed: {}", e))?;
+
+        if !response.status().is_success() {
+            return Err(format!(
+                "Failed to get perks with status {}: {}",
+                response.status(),
+                response.text().await.unwrap_or_default()
+            ));
+        }
+
+        response
+            .json::<PerksResponse>()
+            .await
+            .map_err(|e| format!("Failed to parse perks response: {}", e))
+    }
+
+    /// Shorten a URL
+    pub async fn shorten_url(
+        &self,
+        token: &str,
+        url: &str,
+    ) -> Result<ShortenedUrlResponse, String> {
+        let endpoint = format!("{}/api/urls", self.base_url);
+
+        let response = self
+            .client
+            .post(&endpoint)
+            .header("Authorization", format!("Bearer {}", token))
+            .json(&serde_json::json!({ "url": url }))
+            .send()
+            .await
+            .map_err(|e| format!("Shorten URL request failed: {}", e))?;
+
+        if !response.status().is_success() {
+            return Err(format!(
+                "Failed to shorten URL with status {}: {}",
+                response.status(),
+                response.text().await.unwrap_or_default()
+            ));
+        }
+
+        let envelope = response
+            .json::<DataEnvelope<ShortenedUrlResponse>>()
+            .await
+            .map_err(|e| format!("Failed to parse shorten response: {}", e))?;
+
+        Ok(envelope.data)
+    }
+
+    /// Update a file's visibility and/or password
+    pub async fn update_file(
+        &self,
+        token: &str,
+        file_id: &str,
+        visibility: Option<String>,
+        password: Option<String>,
+    ) -> Result<(), String> {
+        let url = format!("{}/api/files/{}", self.base_url, file_id);
+
+        let mut body = serde_json::Map::new();
+        if let Some(v) = visibility {
+            body.insert("visibility".to_string(), serde_json::Value::String(v));
+        }
+        if let Some(p) = password {
+            body.insert("password".to_string(), serde_json::Value::String(p));
+        }
+
+        let response = self
+            .client
+            .patch(&url)
+            .header("Authorization", format!("Bearer {}", token))
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("Update file request failed: {}", e))?;
+
+        if !response.status().is_success() {
+            return Err(format!(
+                "Failed to update file with status {}: {}",
+                response.status(),
+                response.text().await.unwrap_or_default()
+            ));
+        }
+
+        Ok(())
     }
 
     /// Upload a file to Emberly, optionally reporting progress as bytes are
@@ -176,6 +441,7 @@ impl EmberlyCient {
         file_path: &str,
         visibility: &str,
         password: Option<String>,
+        domain: Option<String>,
         on_progress: Option<Box<dyn Fn(u64, u64) + Send + Sync>>,
     ) -> Result<UploadResponse, String> {
         use futures_util::StreamExt;
@@ -229,6 +495,9 @@ impl EmberlyCient {
 
         if let Some(pwd) = password {
             form = form.text("password", pwd);
+        }
+        if let Some(d) = domain {
+            form = form.text("domain", d);
         }
 
         let response = self
@@ -315,9 +584,9 @@ impl EmberlyCient {
             .map_err(|e| format!("Failed to parse files list: {}", e))
     }
 
-    /// Get user statistics
-    pub async fn get_stats(&self, token: &str) -> Result<serde_json::Value, String> {
-        let url = format!("{}/api/stats", self.base_url);
+    /// Get user upload/usage statistics
+    pub async fn get_stats(&self, token: &str) -> Result<AnalyticsSummary, String> {
+        let url = format!("{}/api/analytics/summary", self.base_url);
 
         let response = self
             .client
@@ -336,7 +605,7 @@ impl EmberlyCient {
         }
 
         response
-            .json::<serde_json::Value>()
+            .json::<AnalyticsSummary>()
             .await
             .map_err(|e| format!("Failed to parse stats response: {}", e))
     }

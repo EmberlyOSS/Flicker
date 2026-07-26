@@ -1,8 +1,13 @@
-/// Desktop platform abstraction - shared capabilities for Windows, macOS, Linux
+/**
+ * Desktop platform-specific capabilities and functions
+ *
+ * This module provides functions and structures to determine the capabilities of the desktop platform
+ * on which the application is running. It includes information about native screenshot support, region capture,
+ * and other platform-specific features.
+ */
 
 use super::detection::PlatformType;
 
-/// Desktop-specific platform capabilities
 pub struct DesktopCapabilities {
     pub native_screenshot: bool,
     pub region_capture: bool,
@@ -12,7 +17,6 @@ pub struct DesktopCapabilities {
     pub elevation_support: bool,
 }
 
-/// Get desktop platform capabilities
 pub fn get_desktop_capabilities() -> DesktopCapabilities {
     DesktopCapabilities {
         native_screenshot: true,
@@ -24,12 +28,10 @@ pub fn get_desktop_capabilities() -> DesktopCapabilities {
     }
 }
 
-/// Check if elevation is available on this desktop platform
 pub fn supports_elevation(platform: PlatformType) -> bool {
     matches!(platform, PlatformType::Windows | PlatformType::MacOs | PlatformType::Linux)
 }
 
-/// Get desktop file access level
 pub fn get_file_access() -> String {
     "full".to_string()
 }

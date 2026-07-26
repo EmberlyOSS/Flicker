@@ -15,6 +15,7 @@ interface UploadAreaProps {
   uploadToken: string
   visibility: 'PUBLIC' | 'PRIVATE'
   password?: string
+  domain?: string
   behavior?: BehaviorConfig
 }
 
@@ -36,7 +37,7 @@ interface UploadProgressEvent extends UploadProgress {
   file_path: string
 }
 
-export function UploadArea({ onUpload, uploadToken, visibility, password, behavior }: UploadAreaProps) {
+export function UploadArea({ onUpload, uploadToken, visibility, password, domain, behavior }: UploadAreaProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [files, setFiles] = useState<QueuedFile[]>([])
   const [copiedId, setCopiedId] = useState<string | null>(null)
@@ -58,6 +59,7 @@ export function UploadArea({ onUpload, uploadToken, visibility, password, behavi
           uploadToken,
           visibility,
           password: password || null,
+          domain: domain || null,
         })
 
         setFiles(prev =>
@@ -83,7 +85,7 @@ export function UploadArea({ onUpload, uploadToken, visibility, password, behavi
         setFiles(prev => prev.map(f => (f.id === id ? { ...f, status: 'error', progress: 0, error: message } : f)))
       }
     },
-    [uploadToken, visibility, password, onUpload, behavior]
+    [uploadToken, visibility, password, domain, onUpload, behavior]
   )
 
   const handleFiles = useCallback(

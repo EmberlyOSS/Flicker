@@ -10,6 +10,7 @@ interface UseHotkeysOptions {
   uploadToken: string;
   visibility: string;
   apiUrl: string;
+  domain?: string;
   enabled: boolean;
   onScreenshotStart?: () => void;
   onUploadComplete?: (result: UploadCompleteEvent) => void;
@@ -45,6 +46,7 @@ export function useHotkeys(options: UseHotkeysOptions) {
         apiUrl: opts.apiUrl,
         uploadToken: opts.uploadToken,
         visibility: opts.visibility,
+        domain: opts.domain || null,
         captureAll,
         monitorIndex: null,
       });
@@ -92,6 +94,7 @@ export function useHotkeys(options: UseHotkeysOptions) {
         uploadToken: opts.uploadToken,
         visibility: opts.visibility,
         password: null,
+        domain: opts.domain || null,
       });
 
       if (response.url) {
@@ -103,6 +106,7 @@ export function useHotkeys(options: UseHotkeysOptions) {
         });
 
         opts.onUploadComplete?.({
+          id: response.id,
           url: response.url,
           name: response.name,
           size: response.size,

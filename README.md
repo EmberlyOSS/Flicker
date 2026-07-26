@@ -5,6 +5,8 @@
 ![App Preview](./public/preview.png)
 
 
+[![Early Access](https://img.shields.io/badge/status-early%20access-orange.svg)](https://github.com/EmberlyOSS/Flicker/releases)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Us-7289da?logo=discord&logoColor=white)](https://embrly.ca/discord)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](https://github.com/EmberlyOSS/Flicker)
 

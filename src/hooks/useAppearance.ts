@@ -3,7 +3,6 @@ import { AppearanceConfig } from '../types'
 
 const STORAGE_KEY = 'flicker_appearance'
 
-// Font family CSS values
 const FONT_FAMILIES = {
   system: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
   inter: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
@@ -12,7 +11,6 @@ const FONT_FAMILIES = {
   poppins: '"Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
 }
 
-// Default appearance settings
 const DEFAULT_APPEARANCE: AppearanceConfig = {
   theme: 'hawkins-neon',
   backgroundOpacity: 1,
@@ -26,7 +24,6 @@ const DEFAULT_APPEARANCE: AppearanceConfig = {
 }
 
 export function useAppearance() {
-  // Load and apply appearance settings on mount
   useEffect(() => {
     applyAppearance(loadAppearance())
   }, [])
@@ -63,32 +60,23 @@ export function saveAppearance(config: Partial<AppearanceConfig>) {
   return updated
 }
 
+/**
+ * Simple function to Apply Appearance Changes.
+ * 
+ */
 export function applyAppearance(config: AppearanceConfig) {
   const root = document.documentElement
-
-  // Font family - set both attribute and CSS variable
   const fontKey = config.fontFamily || 'system'
-  root.setAttribute('data-font', fontKey)
-  root.style.setProperty('--font-family', FONT_FAMILIES[fontKey as keyof typeof FONT_FAMILIES] || FONT_FAMILIES.system)
-  
-  // Font size
-  root.setAttribute('data-font-size', config.fontScale || 'medium')
-  
-  // Border radius - set both attribute and CSS variable  
   const radiusMap = { none: '0px', small: '0.25rem', medium: '0.5rem', large: '0.75rem' }
   const radiusKey = config.borderRadius || 'medium'
+
+  root.setAttribute('data-font', fontKey)
+  root.style.setProperty('--font-family', FONT_FAMILIES[fontKey as keyof typeof FONT_FAMILIES] || FONT_FAMILIES.system)
+  root.setAttribute('data-font-size', config.fontScale || 'medium')
   root.setAttribute('data-radius', radiusKey)
   root.style.setProperty('--radius', radiusMap[radiusKey as keyof typeof radiusMap] || '0.5rem')
-  
-  // Animations
   root.setAttribute('data-animations', String(config.animations ?? true))
-  
-  // Glass effect
   root.setAttribute('data-glass', String(config.glassEffect ?? true))
-  
-  // Compact mode
   root.setAttribute('data-compact', String(config.compactMode ?? false))
-  
-  // Sidebar position  
   root.setAttribute('data-sidebar', config.sidebarPosition || 'left')
 }

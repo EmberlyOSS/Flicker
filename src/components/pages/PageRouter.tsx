@@ -1,9 +1,11 @@
-import { History as HistoryIcon, BarChart3 } from 'lucide-react'
+import { History as HistoryIcon } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import { PageLayout } from '../shared/PageLayout'
 import { UploadArea } from '../upload/UploadArea'
 import { UploadHistory } from '../upload/UploadHistory'
 import { SettingsPage } from '../settings/SettingsPage'
+import { StatsPage } from './StatsPage'
+import { ShortenPage } from './ShortenPage'
 
 export function PageRouter() {
     const {
@@ -29,6 +31,7 @@ export function PageRouter() {
                         uploadToken={config.uploadToken}
                         visibility={config.visibility}
                         password={config.password}
+                        domain={config.preferredDomain}
                         behavior={config.behavior}
                     />
                 </PageLayout>
@@ -43,6 +46,8 @@ export function PageRouter() {
                             onCopy={handleCopyUrl}
                             onDelete={handleDeleteFromHistory}
                             clipboardFormat={config.behavior?.clipboardFormat}
+                            uploadToken={config.uploadToken}
+                            uploadUrl={config.uploadUrl}
                         />
                     ) : (
                         <div className="p-8 text-center glass-card">
@@ -55,11 +60,15 @@ export function PageRouter() {
 
         case 'analytics':
             return (
-                <PageLayout title="Analytics" description="Upload statistics">
-                    <div className="p-12 text-center glass-card">
-                        <BarChart3 size={48} className="mx-auto mb-4 text-primary/30" />
-                        <h3 className="text-xl font-bold">Coming Soon</h3>
-                    </div>
+                <PageLayout title="Stats" description="Your Emberly usage at a glance">
+                    <StatsPage uploadToken={config.uploadToken} uploadUrl={config.uploadUrl} />
+                </PageLayout>
+            )
+
+        case 'shorten':
+            return (
+                <PageLayout title="Shorten" description="Turn a long link into a short one">
+                    <ShortenPage uploadToken={config.uploadToken} uploadUrl={config.uploadUrl} />
                 </PageLayout>
             )
 

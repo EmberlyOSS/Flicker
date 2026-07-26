@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 /// Response from the Emberly file upload API
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct UploadResponse {
+    pub id: Option<String>,
     pub url: String,
     pub name: String,
     pub size: u64,
@@ -23,6 +24,7 @@ pub struct ScreenshotResult {
 /// Upload result with URL for clipboard
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct UploadCompleteEvent {
+    pub id: Option<String>,
     pub url: String,
     pub name: String,
     pub size: u64,

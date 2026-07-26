@@ -3,17 +3,21 @@ import {
   Copy, Trash2, ExternalLink, History, Check, Clock, File,
   Image, Video, Music, FileText, ChevronLeft, ChevronRight,
   Grid3x3, LayoutList, Eye, X, Download, Search, Calendar,
-  ArrowUpDown, SortAsc, SortDesc, CheckSquare, Square
+  ArrowUpDown, SortAsc, SortDesc, CheckSquare, Square, Lock, Globe, Loader2
 } from 'lucide-react'
+import { invoke } from '@tauri-apps/api/core'
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { ClipboardFormat, UploadHistoryItem } from '../../types'
 import { formatForClipboard } from '../../utils/clipboardFormat'
+import { API_URL } from '../../constants'
 
 interface UploadHistoryProps {
   history: UploadHistoryItem[]
   onCopy?: (url: string) => void
   onDelete?: (url: string) => void
   clipboardFormat?: ClipboardFormat
+  uploadToken?: string
+  uploadUrl?: string
 }
 
 async function copyToClipboard(text: string): Promise<void> {
@@ -87,22 +91,53 @@ function PreviewModal({
   onCopy,
   onDelete,
   clipboardFormat,
+  uploadToken,
+  uploadUrl,
 }: {
   item: UploadHistoryItem
   onClose: () => void
   onCopy?: (url: string) => void
   onDelete?: (url: string) => void
   clipboardFormat?: ClipboardFormat
+  uploadToken?: string
+  uploadUrl?: string
 }) {
   const [copied, setCopied] = useState(false)
+  const [visibility, setVisibility] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC')
+  const [password, setPassword] = useState('')
+  const [updating, setUpdating] = useState(false)
+  const [updateError, setUpdateError] = useState<string | null>(null)
+  const [updateSuccess, setUpdateSuccess] = useState(false)
   const category = getFileCategory(item)
   const previewUrl = getPreviewUrl(item.url)
+  const canManage = !!(item.fileId && uploadToken)
 
   const handleCopy = () => {
     copyToClipboard(formatForClipboard(item.url, item.name, clipboardFormat))
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
     onCopy?.(item.url)
+  }
+
+  const handleUpdate = async () => {
+    if (!item.fileId || !uploadToken) return
+    setUpdating(true)
+    setUpdateError(null)
+    try {
+      await invoke('emberly_update_file', {
+        apiUrl: uploadUrl || API_URL,
+        token: uploadToken,
+        fileId: item.fileId,
+        visibility,
+        password: password || null,
+      })
+      setUpdateSuccess(true)
+      setTimeout(() => setUpdateSuccess(false), 2000)
+    } catch (err) {
+      setUpdateError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setUpdating(false)
+    }
   }
   
   return (
@@ -179,7 +214,51 @@ function PreviewModal({
             </div>
           )}
         </div>
-        
+
+        {/* File Management */}
+        {canManage && (
+          <div className="p-4 border-t border-border/50 space-y-3">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setVisibility('PUBLIC')}
+                className={`flex-1 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
+                  visibility === 'PUBLIC' ? 'bg-primary text-primary-foreground' : 'bg-secondary/30 text-muted-foreground hover:bg-secondary/50'
+                }`}
+              >
+                <Globe className="w-3.5 h-3.5" />
+                Public
+              </button>
+              <button
+                onClick={() => setVisibility('PRIVATE')}
+                className={`flex-1 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
+                  visibility === 'PRIVATE' ? 'bg-primary text-primary-foreground' : 'bg-secondary/30 text-muted-foreground hover:bg-secondary/50'
+                }`}
+              >
+                <Lock className="w-3.5 h-3.5" />
+                Private
+              </button>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="New password (optional)"
+                className="flex-1 px-3 py-2 bg-secondary/30 border border-border/30 rounded-lg text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+              <button
+                onClick={handleUpdate}
+                disabled={updating}
+                className={`px-4 py-2 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50 ${
+                  updateSuccess ? 'bg-primary/20 text-primary' : 'bg-secondary/50 hover:bg-secondary text-foreground'
+                }`}
+              >
+                {updating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : updateSuccess ? <Check className="w-3.5 h-3.5" /> : null}
+                {updateSuccess ? 'Saved' : 'Save'}
+              </button>
+            </div>
+            {updateError && <p className="text-xs text-destructive">{updateError}</p>}
+          </div>
+        )}
+
         {/* Footer */}
         <div className="flex items-center justify-between gap-2 p-4 border-t border-border/50 bg-background/50">
           <div className="flex gap-2">
@@ -311,7 +390,7 @@ function Thumbnail({ item, onClick }: { item: UploadHistoryItem; onClick: () => 
   )
 }
 
-export function UploadHistory({ history, onCopy, onDelete, clipboardFormat }: UploadHistoryProps) {
+export function UploadHistory({ history, onCopy, onDelete, clipboardFormat, uploadToken, uploadUrl }: UploadHistoryProps) {
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
@@ -838,6 +917,8 @@ export function UploadHistory({ history, onCopy, onDelete, clipboardFormat }: Up
           onCopy={onCopy}
           onDelete={onDelete}
           clipboardFormat={clipboardFormat}
+          uploadToken={uploadToken}
+          uploadUrl={uploadUrl}
         />
       )}
     </div>

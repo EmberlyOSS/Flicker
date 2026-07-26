@@ -74,15 +74,16 @@ export function saveUploadHistory(history: UploadHistoryItem[]): void {
   localStorage.setItem(UPLOAD_HISTORY_KEY, JSON.stringify(history.slice(0, 100)))
 }
 
-export function addToUploadHistory(url: string, name: string, fileType?: string, size?: number, thumbnailUrl?: string): void {
+export function addToUploadHistory(url: string, name: string, fileType?: string, size?: number, thumbnailUrl?: string, fileId?: string): void {
   const history = loadUploadHistory()
-  history.unshift({ 
-    url, 
-    name, 
+  history.unshift({
+    url,
+    name,
     timestamp: Date.now(),
     fileType: fileType || getMimeTypeFromUrl(url),
     size,
     thumbnailUrl: thumbnailUrl || (isImageUrl(url) ? url : undefined),
+    fileId,
   })
   saveUploadHistory(history)
 }

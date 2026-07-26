@@ -9,7 +9,7 @@
 export const API_URL = 'https://embrly.ca'
 
 // App version
-export const APP_VERSION = '0.2.0-beta'
+export const APP_VERSION = '0.3.0'
 
 // App name
 export const APP_NAME = 'Flicker'

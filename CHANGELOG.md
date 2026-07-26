@@ -12,6 +12,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.0] - 2026-07-26
+
+Flicker moves out of beta. It's stable enough for daily use, but still
+**early access** — expect new features and occasional rough edges while the
+app and its Emberly integration keep growing.
+
+### Added
+- Stats page: replaces the old "Coming Soon" placeholder with real usage
+  data pulled from your Emberly account — total files, storage used, short
+  URL count and clicks, total views/downloads, domain count, a 14-day
+  uploads chart, and a recent-uploads list (sections respect your plan's
+  actual limits instead of showing data you don't have access to).
+- URL Shortener: a new page to turn a long link into a short one and copy
+  it, without leaving the app.
+- Custom upload domain: Settings → Capture now has a domain picker sourced
+  from your verified Emberly domains, and it's respected by every upload
+  path (drag-and-drop, clipboard, hotkey/screenshot capture).
+- File management from Upload History: opening a history item now lets you
+  toggle its visibility (Public/Private) and set a password directly,
+  without needing the website. Deleting a history item now also deletes the
+  file from your Emberly account, not just the local list entry.
+- Perks display: Settings → Account now shows your active perk bonuses
+  (extra storage, extra domains) when you have any active.
+
+### Fixed
+- `get_profile`, `validate_token`, and `get_stats` called API endpoints that
+  don't exist on the real server (leftover scaffolding with no working UI
+  behind it) and always failed. They now call the correct endpoints
+  (`/api/profile`, `/api/analytics/summary`) and return real data.
+- `delete_file` existed in the Rust API client but was never wired to a
+  Tauri command, making it unreachable from the UI. It's now registered and
+  used by Upload History's delete action.
+
 ## [0.2.0-beta] - 2026-07-26
 
 ### Added
