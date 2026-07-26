@@ -1,5 +1,6 @@
 export interface AppConfig {
   uploadToken: string
+  uploadUrl?: string
   visibility: 'PUBLIC' | 'PRIVATE'
   password?: string
   autoUpload: boolean
@@ -10,6 +11,47 @@ export interface AppConfig {
   hotkeys?: HotkeyConfig
   // Screenshot settings
   screenshotMode?: ScreenshotMode
+
+  // -- NEW CUSTOMIZATION --
+  appearance?: AppearanceConfig
+  behavior?: BehaviorConfig
+  capture?: CaptureConfig
+}
+
+export interface AppearanceConfig {
+  theme: string // 'dark', 'light', 'midnight', etc.
+  backgroundOpacity: number // 0.5 to 1.0
+  fontScale: 'small' | 'medium' | 'large'
+  fontFamily: 'system' | 'inter' | 'roboto' | 'mono' | 'poppins'
+  borderRadius: 'none' | 'small' | 'medium' | 'large'
+  sidebarPosition: 'left' | 'right'
+  compactMode: boolean
+  animations: boolean
+  glassEffect: boolean
+  customColors?: {
+    primary: string
+    secondary: string
+    background: string
+  }
+}
+
+export type PostUploadAction = 'copy' | 'open' | 'none'
+export type ClipboardFormat = 'url' | 'raw-url' | 'markdown' | 'html'
+
+export interface BehaviorConfig {
+  postUploadAction: PostUploadAction
+  clipboardFormat: ClipboardFormat
+  playSound: boolean
+  startAtLogin: boolean
+}
+
+export interface CaptureConfig {
+  format: 'png' | 'jpg'
+  quality: number // 1-100 (for jpg)
+  delay: number // seconds
+  filenamePattern: string // e.g. "Screen_{date}_{time}"
+  saveLocally: boolean
+  includeCursor: boolean
 }
 
 export type ScreenshotMode = 'primary' | 'active' | 'all'
@@ -102,4 +144,37 @@ export interface UploadHistoryItem {
   fileType?: string
   size?: number
   thumbnailUrl?: string
+}
+
+// ============================================================================
+// Notification Types
+// ============================================================================
+
+export type NotificationPriority = 'system' | 'important' | 'default' | 'transient'
+export type NotificationCategory = 'admin' | 'security' | 'account' | 'update' | 'upload' | 'error' | 'info' | 'success'
+
+export interface AppNotification {
+  id: string
+  priority: NotificationPriority
+  category: NotificationCategory
+  title: string
+  message: string
+  timestamp: number
+  read: boolean
+  dismissed: boolean
+  persistent: boolean
+  action_label?: string
+  action_id?: string
+  metadata?: Record<string, unknown>
+}
+
+export interface AddNotificationParams {
+  priority: NotificationPriority
+  category: NotificationCategory
+  title: string
+  message: string
+  persistent?: boolean
+  actionLabel?: string
+  actionId?: string
+  metadata?: Record<string, unknown>
 }

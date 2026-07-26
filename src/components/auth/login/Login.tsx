@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { LogIn, Eye, EyeOff, Loader2, AlertCircle, Shield } from 'lucide-react'
-import { LoginRequest, LoginResponse } from '../types'
-import { Logo } from './Logo'
-import { API_URL } from '../constants'
+import { LoginRequest, LoginResponse } from '../../../types'
+import { Logo } from '../../ui/Logo'
+import { API_URL } from '../../../constants'
 
 interface LoginProps {
   onLogin: (uploadToken: string, user: LoginResponse['user']) => void

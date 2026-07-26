@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Menu, X, Camera, Zap } from 'lucide-react';
 import { NavItem } from './Sidebar';
-import { Logo } from './Logo';
-import { APP_VERSION } from '../constants';
-import '../styles/MobileSidebar.css';
+import { Logo } from '../Logo';
+import { APP_VERSION } from '../../../constants';
+import '../../../styles/MobileSidebar.css';
 
 interface MobileSidebarProps {
   activeNav: string;
@@ -45,7 +45,7 @@ export function MobileSidebar({
   return (
     <>
       {/* Mobile Header */}
-      <header className="mobile-header glass-card border-b border-border/50">
+      <header className="mobile-header glass-elevated border-b border-border/40 rounded-none">
         <div className="flex items-center justify-between px-4 py-3">
           {/* Logo and branding */}
           <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -85,10 +85,10 @@ export function MobileSidebar({
             {isLoggedIn && onScreenshot && (
               <button
                 onClick={onScreenshot}
-                className="p-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors shadow-md shadow-primary/20"
+                className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/25 border border-primary/20 hover:shadow-primary/40 hover:scale-105 active:scale-95 transition-all duration-200"
                 aria-label="Take Screenshot"
               >
-                <Camera size={18} />
+                <Camera size={20} className="drop-shadow-sm" />
               </button>
             )}
             {/* Sign In button if not logged in */}
@@ -121,7 +121,7 @@ export function MobileSidebar({
 
       {/* Mobile Menu */}
       <nav
-        className={`mobile-menu glass-card border-b border-border/50 fixed left-0 right-0 top-[60px] z-40 lg:hidden overflow-y-auto transition-all duration-300 ${
+        className={`mobile-menu glass-elevated border-b border-border/40 rounded-none fixed left-0 right-0 top-[60px] z-40 lg:hidden overflow-y-auto transition-all duration-300 ${
           isOpen ? 'max-h-[80vh] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
         }`}
       >

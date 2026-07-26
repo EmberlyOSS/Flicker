@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { Download, RefreshCw } from 'lucide-react'
 import { check } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
-import { Logo } from './Logo'
-import { APP_NAME, APP_VERSION } from '../constants'
+import { Logo } from '../ui/Logo'
+import { APP_NAME, APP_VERSION } from '../../constants'
 
 // Fun facts, tips, and easter eggs
 const LOADING_FACTS = [
@@ -186,12 +186,10 @@ export function SplashScreen({ onComplete, minDisplayTime = DEFAULT_MIN_DISPLAY 
         setPhase('checking-update')
         await animateProgress(50, 60, 400)
 
-        let updateAvailable = false
         try {
           const update = await check()
-          
+
           if (update) {
-            updateAvailable = true
             setUpdateVersion(update.version)
             await animateProgress(60, 65, 300)
             setPhase('downloading-update')
@@ -281,8 +279,8 @@ export function SplashScreen({ onComplete, minDisplayTime = DEFAULT_MIN_DISPLAY 
     <div className="fixed inset-0 gradient-bg flex items-center justify-center z-[100]">
       {/* Animated background particles */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-primary/5 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-primary/3 rounded-full blur-3xl animate-pulse delay-1000" />
+        <div className="absolute w-64 h-64 rounded-full top-1/4 left-1/4 bg-primary/5 blur-3xl animate-pulse" />
+        <div className="absolute delay-1000 rounded-full bottom-1/4 right-1/4 w-96 h-96 bg-primary/3 blur-3xl animate-pulse" />
       </div>
 
       <div className="relative flex flex-col items-center gap-6 p-8">
@@ -310,13 +308,13 @@ export function SplashScreen({ onComplete, minDisplayTime = DEFAULT_MIN_DISPLAY 
         </div>
 
         {/* App Name & Tagline */}
-        <div className="text-center space-y-3 mt-2">
+        <div className="mt-2 space-y-3 text-center">
           <h1 className={`text-4xl font-bold text-foreground tracking-tight transition-all duration-500 ${isReady ? 'text-primary scale-105' : ''}`}>
             {APP_NAME}
           </h1>
           
           {/* Rotating fun facts */}
-          <div className="h-12 flex items-center justify-center">
+          <div className="flex items-center justify-center h-12">
             <p 
               className={`text-sm text-muted-foreground max-w-xs text-center transition-all duration-300 ${
                 factFading ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'
@@ -328,11 +326,11 @@ export function SplashScreen({ onComplete, minDisplayTime = DEFAULT_MIN_DISPLAY 
         </div>
 
         {/* Progress Section */}
-        <div className="w-72 space-y-2">
+        <div className="space-y-2 w-72">
           {/* Progress Bar */}
           <div className="h-1.5 bg-secondary/20 rounded-full overflow-hidden backdrop-blur-sm">
             <div 
-              className="h-full bg-gradient-to-r from-primary via-primary to-primary/60 rounded-full transition-all duration-200 ease-out relative"
+              className="relative h-full transition-all duration-200 ease-out rounded-full bg-gradient-to-r from-primary via-primary to-primary/60"
               style={{ width: `${Math.min(progress, 100)}%` }}
             >
               {/* Shimmer effect */}
@@ -354,14 +352,14 @@ export function SplashScreen({ onComplete, minDisplayTime = DEFAULT_MIN_DISPLAY 
         {/* Update Badge */}
         {updateVersion && showDownloadUI && (
           <div className="px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
-            <p className="text-xs text-primary font-medium">
+            <p className="text-xs font-medium text-primary">
               Updating to v{updateVersion}
             </p>
           </div>
         )}
 
         {/* Footer */}
-        <p className="text-xs text-muted-foreground/50 mt-4">
+        <p className="mt-4 text-xs text-muted-foreground/50">
           v{APP_VERSION}
         </p>
       </div>

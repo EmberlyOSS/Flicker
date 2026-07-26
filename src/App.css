@@ -111,3 +111,21 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Custom Titlebar Styles */
+.titlebar {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.titlebar button,
+.titlebar a,
+.titlebar-button {
+  -webkit-app-region: no-drag;
+}
+
+/* Prevent titlebar buttons from having min-width */
+.titlebar-button {
+  min-width: unset;
+  min-height: unset;
+}

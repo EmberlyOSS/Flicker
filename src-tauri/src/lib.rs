@@ -1,89 +1,29 @@
-use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
-use tauri::{Emitter, Manager};
-use screenshots::Screen;
-use uuid::Uuid;
+/// Flicker Tauri Backend - Screenshot and upload tool
+/// 
+/// This module provides a modular architecture for screenshot capture,
+/// file operations, and upload functionality with desktop and mobile support.
 
-/// Response from the Emberly file upload API
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct UploadResponse {
-    pub url: String,
-    pub name: String,
-    pub size: u64,
-    #[serde(rename = "type")]
-    pub file_type: String,
-}
+pub mod common;
+pub mod platform;
+pub mod desktop;
+pub mod mobile;
 
-/// Screenshot result with file path
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ScreenshotResult {
-    pub path: String,
-    pub width: u32,
-    pub height: u32,
-}
+use tauri::Manager;
+use common::{
+    ScreenshotResult, UploadCompleteEvent, UploadResponse,
+    get_screenshots_dir,
+};
 
-/// Upload result with URL for clipboard
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct UploadCompleteEvent {
-    pub url: String,
-    pub name: String,
-    pub size: u64,
-    pub file_type: String,
-    pub screenshot_path: Option<String>,
-}
-
-/// Get the screenshots directory
-fn get_screenshots_dir() -> Result<PathBuf, String> {
-    let base_dir = dirs::picture_dir()
-        .or_else(dirs::home_dir)
-        .ok_or("Could not find pictures directory")?;
-    
-    let screenshots_dir = base_dir.join("Flicker Screenshots");
-    
-    if !screenshots_dir.exists() {
-        std::fs::create_dir_all(&screenshots_dir)
-            .map_err(|e| format!("Failed to create screenshots directory: {}", e))?;
-    }
-    
-    Ok(screenshots_dir)
-}
+// Platform-specific screenshot module
+#[cfg(feature = "desktop")]
+use desktop::screenshot;
+#[cfg(feature = "mobile")]
+use mobile::screenshot;
 
 /// Capture a screenshot of the entire screen or primary monitor
 #[tauri::command]
 async fn capture_screenshot(monitor_index: Option<usize>) -> Result<ScreenshotResult, String> {
-    let screens = Screen::all().map_err(|e| format!("Failed to get screens: {}", e))?;
-    
-    if screens.is_empty() {
-        return Err("No screens found".to_string());
-    }
-    
-    let screen_idx = monitor_index.unwrap_or(0);
-    let screen = screens.get(screen_idx)
-        .ok_or_else(|| format!("Monitor {} not found", screen_idx))?;
-    
-    let image = screen.capture()
-        .map_err(|e| format!("Failed to capture screen: {}", e))?;
-    
-    let width = image.width();
-    let height = image.height();
-    
-    // Generate unique filename with timestamp
-    let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
-    let uuid_short = &Uuid::new_v4().to_string()[..8];
-    let filename = format!("screenshot_{}_{}.png", timestamp, uuid_short);
-    
-    let screenshots_dir = get_screenshots_dir()?;
-    let file_path = screenshots_dir.join(&filename);
-    
-    // Save the screenshot
-    image.save(&file_path)
-        .map_err(|e| format!("Failed to save screenshot: {}", e))?;
-    
-    Ok(ScreenshotResult {
-        path: file_path.to_string_lossy().to_string(),
-        width,
-        height,
-    })
+    screenshot::capture_screenshot(monitor_index).await
 }
 
 /// Capture a specific region of the screen
@@ -95,54 +35,23 @@ async fn capture_region(
     height: u32,
     monitor_index: Option<usize>,
 ) -> Result<ScreenshotResult, String> {
-    let screens = Screen::all().map_err(|e| format!("Failed to get screens: {}", e))?;
-    
-    if screens.is_empty() {
-        return Err("No screens found".to_string());
-    }
-    
-    let screen_idx = monitor_index.unwrap_or(0);
-    let screen = screens.get(screen_idx)
-        .ok_or_else(|| format!("Monitor {} not found", screen_idx))?;
-    
-    let image = screen.capture_area(x, y, width, height)
-        .map_err(|e| format!("Failed to capture region: {}", e))?;
-    
-    let img_width = image.width();
-    let img_height = image.height();
-    
-    let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
-    let uuid_short = &Uuid::new_v4().to_string()[..8];
-    let filename = format!("screenshot_{}_{}.png", timestamp, uuid_short);
-    
-    let screenshots_dir = get_screenshots_dir()?;
-    let file_path = screenshots_dir.join(&filename);
-    
-    image.save(&file_path)
-        .map_err(|e| format!("Failed to save screenshot: {}", e))?;
-    
-    Ok(ScreenshotResult {
-        path: file_path.to_string_lossy().to_string(),
-        width: img_width,
-        height: img_height,
-    })
+    screenshot::capture_region(x, y, width, height, monitor_index).await
 }
 
 /// Get list of available monitors
 #[tauri::command]
 fn get_monitors() -> Result<Vec<serde_json::Value>, String> {
-    let screens = Screen::all().map_err(|e| format!("Failed to get screens: {}", e))?;
-    
-    Ok(screens.iter().enumerate().map(|(i, screen)| {
+    let monitors = screenshot::get_monitors()?;
+    Ok(monitors.into_iter().map(|m| {
         serde_json::json!({
-            "index": i,
-            "id": screen.display_info.id,
-            "x": screen.display_info.x,
-            "y": screen.display_info.y,
-            "width": screen.display_info.width,
-            "height": screen.display_info.height,
-            "is_primary": screen.display_info.is_primary,
-            "scale_factor": screen.display_info.scale_factor,
+            "index": m.index,
+            "id": m.id,
+            "x": m.x,
+            "y": m.y,
+            "width": m.width,
+            "height": m.height,
+            "is_primary": m.is_primary,
+            "scale_factor": m.scale_factor,
         })
     }).collect())
 }
@@ -150,89 +59,13 @@ fn get_monitors() -> Result<Vec<serde_json::Value>, String> {
 /// Get the monitor index at a specific screen coordinate
 #[tauri::command]
 fn get_monitor_at_point(x: i32, y: i32) -> Result<Option<usize>, String> {
-    let screens = Screen::all().map_err(|e| format!("Failed to get screens: {}", e))?;
-    
-    for (i, screen) in screens.iter().enumerate() {
-        let info = &screen.display_info;
-        let screen_x = info.x;
-        let screen_y = info.y;
-        let screen_width = info.width as i32;
-        let screen_height = info.height as i32;
-        
-        if x >= screen_x && x < screen_x + screen_width &&
-           y >= screen_y && y < screen_y + screen_height {
-            return Ok(Some(i));
-        }
-    }
-    
-    Ok(None)
+    screenshot::get_monitor_at_point(x, y)
 }
 
 /// Capture all monitors combined into a single image
 #[tauri::command]
 async fn capture_all_monitors() -> Result<ScreenshotResult, String> {
-    let screens = Screen::all().map_err(|e| format!("Failed to get screens: {}", e))?;
-    
-    if screens.is_empty() {
-        return Err("No screens found".to_string());
-    }
-    
-    // Calculate the bounding box for all monitors
-    let mut min_x = i32::MAX;
-    let mut min_y = i32::MAX;
-    let mut max_x = i32::MIN;
-    let mut max_y = i32::MIN;
-    
-    for screen in &screens {
-        let info = &screen.display_info;
-        min_x = min_x.min(info.x);
-        min_y = min_y.min(info.y);
-        max_x = max_x.max(info.x + info.width as i32);
-        max_y = max_y.max(info.y + info.height as i32);
-    }
-    
-    let total_width = (max_x - min_x) as u32;
-    let total_height = (max_y - min_y) as u32;
-    
-    // Create a new image buffer for the combined screenshot
-    let mut combined = image::RgbaImage::new(total_width, total_height);
-    
-    // Capture each screen and composite them
-    for screen in &screens {
-        let info = &screen.display_info;
-        let capture = screen.capture()
-            .map_err(|e| format!("Failed to capture screen: {}", e))?;
-        
-        // Calculate where this screen goes in the combined image
-        let offset_x = (info.x - min_x) as u32;
-        let offset_y = (info.y - min_y) as u32;
-        
-        // Copy pixels from the capture to the combined image
-        for (x, y, pixel) in capture.enumerate_pixels() {
-            let dest_x = offset_x + x;
-            let dest_y = offset_y + y;
-            if dest_x < total_width && dest_y < total_height {
-                combined.put_pixel(dest_x, dest_y, *pixel);
-            }
-        }
-    }
-    
-    // Save the combined image
-    let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
-    let uuid_short = &Uuid::new_v4().to_string()[..8];
-    let filename = format!("screenshot_all_{}_{}.png", timestamp, uuid_short);
-    
-    let screenshots_dir = get_screenshots_dir()?;
-    let file_path = screenshots_dir.join(&filename);
-    
-    combined.save(&file_path)
-        .map_err(|e| format!("Failed to save screenshot: {}", e))?;
-    
-    Ok(ScreenshotResult {
-        path: file_path.to_string_lossy().to_string(),
-        width: total_width,
-        height: total_height,
-    })
+    screenshot::capture_all_monitors().await
 }
 
 /// Uploads a file to the Emberly instance
@@ -245,77 +78,86 @@ async fn upload_file(
     visibility: String,
     password: Option<String>,
 ) -> Result<UploadResponse, String> {
-    let file_path_buf = PathBuf::from(&file_path);
-    
-    // Read file
-    let file_bytes = std::fs::read(&file_path_buf)
-        .map_err(|e| format!("Failed to read file: {}", e))?;
-    
-    let file_name = file_path_buf
-        .file_name()
-        .ok_or("Invalid file path")?
-        .to_string_lossy()
-        .to_string();
-    
-    let mime_type = mime_guess::from_path(&file_path_buf)
-        .first_raw()
-        .unwrap_or("application/octet-stream")
-        .to_string();
-    
-    // Create multipart form
-    let client = reqwest::Client::new();
-    let mut form = reqwest::multipart::Form::new()
-        .part("file", reqwest::multipart::Part::bytes(file_bytes)
-            .file_name(file_name.clone())
-            .mime_str(&mime_type)
-            .map_err(|e| e.to_string())?)
-        .text("visibility", visibility);
-    
-    if let Some(pwd) = password {
-        form = form.text("password", pwd);
-    }
-    
-    let upload_url = format!("{}/api/files", api_url.trim_end_matches('/'));
-    
-    let response = client
-        .post(&upload_url)
-        .header("Authorization", format!("Bearer {}", upload_token))
-        .multipart(form)
-        .send()
-        .await
-        .map_err(|e| format!("Upload request failed: {}", e))?;
-    
-    if !response.status().is_success() {
-        return Err(format!(
-            "Upload failed with status {}: {}",
-            response.status(),
-            response.text().await.unwrap_or_default()
-        ));
-    }
-    
-    let body: serde_json::Value = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse response: {}", e))?;
-    
-    let data = body
-        .get("data")
-        .ok_or("Missing 'data' in response")?;
-    
-    let upload_response: UploadResponse = serde_json::from_value(data.clone())
-        .map_err(|e| format!("Failed to parse upload response: {}", e))?;
-    
-    // Emit success event with file path for preview
-    let event = UploadCompleteEvent {
-        url: upload_response.url.clone(),
-        name: upload_response.name.clone(),
-        size: upload_response.size,
-        file_type: upload_response.file_type.clone(),
-        screenshot_path: Some(file_path),
+    let progress_path = file_path.clone();
+    let progress_window = window.clone();
+    let on_progress = move |uploaded: u64, total: u64| {
+        let percentage = if total > 0 { (uploaded as f64 / total as f64) * 100.0 } else { 0.0 };
+        desktop::app::emit_event(
+            &progress_window,
+            "upload_progress",
+            &common::UploadProgressEvent {
+                file_path: progress_path.clone(),
+                uploaded,
+                total,
+                percentage,
+            },
+        );
     };
-    let _ = window.emit("upload_complete", &event);
-    
-    Ok(upload_response)
+
+    let response = common::upload_file(
+        file_path.clone(),
+        api_url,
+        upload_token,
+        visibility,
+        password,
+        Some(Box::new(on_progress)),
+    )
+    .await?;
+
+    // Emit success event with file path for preview
+    let event = common::create_upload_event(response.clone(), Some(file_path));
+    desktop::app::emit_event(&window, "upload_complete", &event);
+
+    Ok(response)
+}
+
+/// Uploads whatever image is currently on the OS clipboard.
+/// Saves it to the screenshots directory first so it has a real file path,
+/// then reuses the standard upload flow.
+#[tauri::command]
+async fn upload_clipboard_image(
+    app: tauri::AppHandle,
+    window: tauri::Window,
+    api_url: String,
+    upload_token: String,
+    visibility: String,
+    password: Option<String>,
+) -> Result<UploadResponse, String> {
+    use tauri_plugin_clipboard_manager::ClipboardExt;
+
+    let clipboard_image = app
+        .clipboard()
+        .read_image()
+        .map_err(|_| "No image found on the clipboard".to_string())?;
+
+    let width = clipboard_image.width();
+    let height = clipboard_image.height();
+    let buffer: image::RgbaImage =
+        image::ImageBuffer::from_raw(width, height, clipboard_image.rgba().to_vec())
+            .ok_or("Failed to decode clipboard image")?;
+
+    let dir = get_screenshots_dir()?;
+    let file_name = format!("clipboard_{}.png", chrono::Local::now().format("%Y%m%d_%H%M%S"));
+    let file_path = dir.join(&file_name);
+    buffer
+        .save(&file_path)
+        .map_err(|e| format!("Failed to save clipboard image: {}", e))?;
+    let file_path = file_path.to_string_lossy().to_string();
+
+    let response = common::upload_file(
+        file_path.clone(),
+        api_url,
+        upload_token,
+        visibility,
+        password,
+        None,
+    )
+    .await?;
+
+    let event = common::create_upload_event(response.clone(), Some(file_path));
+    desktop::app::emit_event(&window, "upload_complete", &event);
+
+    Ok(response)
 }
 
 /// Take screenshot, upload it, and return the URL
@@ -329,50 +171,39 @@ async fn screenshot_and_upload(
     capture_all: Option<bool>,
 ) -> Result<UploadCompleteEvent, String> {
     // Emit that we're starting
-    let _ = window.emit("screenshot_started", serde_json::json!({}));
+    desktop::app::emit_event(&window, "screenshot_started", serde_json::json!({}));
     
     // Capture screenshot based on mode
-    let screenshot = if capture_all.unwrap_or(false) {
-        capture_all_monitors().await?
+    let screenshot_result = if capture_all.unwrap_or(false) {
+        screenshot::capture_all_monitors().await?
     } else {
-        capture_screenshot(monitor_index).await?
+        screenshot::capture_screenshot(monitor_index).await?
     };
     
-    let _ = window.emit("screenshot_captured", &screenshot);
+    desktop::app::emit_event(&window, "screenshot_captured", &screenshot_result);
     
     // Upload it
-    let upload_result = upload_file(
-        window.clone(),
-        screenshot.path.clone(),
+    let upload_result = common::upload_file(
+        screenshot_result.path.clone(),
         api_url,
         upload_token,
         visibility,
         None,
+        None,
     ).await?;
     
-    let event = UploadCompleteEvent {
-        url: upload_result.url,
-        name: upload_result.name,
-        size: upload_result.size,
-        file_type: upload_result.file_type,
-        screenshot_path: Some(screenshot.path),
-    };
+    let event = common::create_upload_event(upload_result, Some(screenshot_result.path));
     
     // Emit final event
-    let _ = window.emit("screenshot_uploaded", &event);
+    desktop::app::emit_event(&window, "screenshot_uploaded", &event);
     
     Ok(event)
 }
 
 /// Gets system information
 #[tauri::command]
-fn get_system_info() -> serde_json::Value {
-    serde_json::json!({
-        "platform": std::env::consts::OS,
-        "arch": std::env::consts::ARCH,
-        "temp_dir": std::env::temp_dir().to_string_lossy(),
-        "screenshots_dir": get_screenshots_dir().ok(),
-    })
+fn get_system_info() -> common::SystemInfo {
+    platform::get_system_info()
 }
 
 /// Get screenshots directory path
@@ -382,65 +213,332 @@ fn get_screenshots_path() -> Result<String, String> {
     Ok(dir.to_string_lossy().to_string())
 }
 
+/// Get test image path (icon.png)
+#[tauri::command]
+fn get_test_image_path(app_handle: tauri::AppHandle) -> Result<String, String> {
+    // 1. Try resource directory (Production)
+    if let Ok(resource_dir) = app_handle.path().resource_dir() {
+        let resource_path = resource_dir.join("icons").join("icon.png");
+        if resource_path.exists() {
+            return Ok(resource_path.to_string_lossy().to_string());
+        }
+    }
+
+    // 2. Try development icons directory (Relative to current dir)
+    if let Ok(current_dir) = std::env::current_dir() {
+        let dev_path = current_dir.join("src-tauri").join("icons").join("icon.png");
+        if dev_path.exists() {
+            return Ok(dev_path.to_string_lossy().to_string());
+        }
+
+        // Try public dir fallback
+        let public_path = current_dir.join("public").join("icon.png");
+        if public_path.exists() {
+            return Ok(public_path.to_string_lossy().to_string());
+        }
+    }
+
+    // 3. Try to find it in the project root if we're in src-tauri
+    if let Ok(current_dir) = std::env::current_dir() {
+        if current_dir.ends_with("src-tauri") {
+            let root_path = current_dir
+                .parent()
+                .unwrap()
+                .join("src-tauri")
+                .join("icons")
+                .join("icon.png");
+            if root_path.exists() {
+                return Ok(root_path.to_string_lossy().to_string());
+            }
+        }
+    }
+
+    Err("Could not find test image (icon.png) in any expected location".to_string())
+}
+
+/// Get current permission status
+#[tauri::command]
+fn get_permission_status() -> serde_json::Value {
+    let status = common::get_permission_status();
+    serde_json::json!({
+        "can_screenshot": status.can_screenshot,
+        "can_access_clipboard": status.can_access_clipboard,
+        "can_access_files": status.can_access_files,
+    })
+}
+
+/// Get platform capabilities (what features are available)
+#[tauri::command]
+fn get_platform_capabilities() -> serde_json::Value {
+    let caps = platform::get_capabilities();
+    serde_json::json!({
+        "platform": platform::get_platform_name(),
+        "is_desktop": platform::is_desktop(),
+        "is_mobile": platform::is_mobile(),
+        "native_screenshot": caps.native_screenshot,
+        "region_capture": caps.region_capture,
+        "multi_monitor": caps.multi_monitor,
+        "system_tray": caps.system_tray,
+        "clipboard_access": caps.clipboard_access,
+        "file_access": caps.file_access,
+        "elevation_support": caps.elevation_support,
+    })
+}
+
+/// Load app configuration from disk
+#[tauri::command]
+fn load_config() -> Result<serde_json::Value, String> {
+    let config = common::load_config()?;
+    Ok(serde_json::to_value(config)
+        .map_err(|e| format!("Failed to serialize config: {}", e))?)
+}
+
+/// Save app configuration to disk
+#[tauri::command]
+fn save_config(config: serde_json::Value) -> Result<(), String> {
+    let app_config: common::AppConfig = serde_json::from_value(config)
+        .map_err(|e| format!("Failed to parse config: {}", e))?;
+    common::save_config(&app_config)
+}
+
+/// Load upload history from disk
+#[tauri::command]
+fn load_history() -> Result<Vec<serde_json::Value>, String> {
+    let history = common::load_history()?;
+    Ok(history.into_iter()
+        .map(|item| serde_json::to_value(item).unwrap_or_default())
+        .collect())
+}
+
+/// Add item to upload history
+#[tauri::command]
+fn add_to_history(item: serde_json::Value) -> Result<(), String> {
+    let history_item: common::UploadHistoryItem = serde_json::from_value(item)
+        .map_err(|e| format!("Failed to parse history item: {}", e))?;
+    common::add_to_history(history_item)
+}
+
+/// Clear all upload history
+#[tauri::command]
+fn clear_history() -> Result<(), String> {
+    common::clear_history()
+}
+
+/// Login to Emberly with email/username and password
+#[tauri::command]
+async fn emberly_login(
+    api_url: String,
+    email_or_username: String,
+    password: String,
+    two_factor_code: Option<String>,
+) -> Result<serde_json::Value, String> {
+    let client = common::EmberlyCient::new(api_url);
+    let response = client
+        .login(email_or_username, password, two_factor_code)
+        .await?;
+    
+    Ok(serde_json::to_value(response)
+        .map_err(|e| format!("Failed to serialize login response: {}", e))?)
+}
+
+/// Get user profile from Emberly
+#[tauri::command]
+async fn emberly_get_profile(
+    api_url: String,
+    token: String,
+) -> Result<serde_json::Value, String> {
+    let client = common::EmberlyCient::new(api_url);
+    let profile = client.get_profile(&token).await?;
+    
+    Ok(serde_json::to_value(profile)
+        .map_err(|e| format!("Failed to serialize profile: {}", e))?)
+}
+
+/// Validate an Emberly upload token
+#[tauri::command]
+async fn emberly_validate_token(
+    api_url: String,
+    token: String,
+) -> Result<bool, String> {
+    let client = common::EmberlyCient::new(api_url);
+    client.validate_token(&token).await
+}
+
+/// Upload a file to Emberly
+#[tauri::command]
+async fn emberly_upload_file(
+    api_url: String,
+    token: String,
+    file_path: String,
+    visibility: String,
+    password: Option<String>,
+) -> Result<serde_json::Value, String> {
+    let client = common::EmberlyCient::new(api_url);
+    let response = client
+        .upload_file(&token, &file_path, &visibility, password, None)
+        .await?;
+    
+    Ok(serde_json::to_value(response)
+        .map_err(|e| format!("Failed to serialize upload response: {}", e))?)
+}
+
+/// Get user statistics from Emberly
+#[tauri::command]
+async fn emberly_get_stats(
+    api_url: String,
+    token: String,
+) -> Result<serde_json::Value, String> {
+    let client = common::EmberlyCient::new(api_url);
+    client.get_stats(&token).await
+}
+
+/// Get device information for support/diagnostics
+#[tauri::command]
+fn get_device_info() -> Result<common::DeviceInfo, String> {
+    Ok(common::get_device_info())
+}
+
+/// Get audit logs (optionally limited to last N entries)
+#[tauri::command]
+fn get_audit_logs(limit: Option<usize>) -> Result<Vec<common::AuditLogEntry>, String> {
+    common::get_audit_logs(limit)
+}
+
+/// Get audit logs with device info appended for support export
+#[tauri::command]
+fn get_audit_logs_with_device() -> Result<Vec<common::AuditLogEntry>, String> {
+    common::get_audit_logs_with_device_info(None)
+}
+
+/// Export audit logs as JSON string for user sharing
+#[tauri::command]
+fn export_audit_logs() -> Result<String, String> {
+    common::export_audit_logs()
+}
+
+/// Clear all audit logs
+#[tauri::command]
+fn clear_audit_logs() -> Result<(), String> {
+    common::clear_audit_logs()
+}
+
+/// Log an event to the audit system (for frontend-initiated events)
+#[tauri::command]
+fn log_event(
+    event_type: String,
+    message: String,
+    level: String,
+    metadata: Option<serde_json::Value>,
+) -> Result<(), String> {
+    common::log_event(&event_type, &message, &level, metadata)
+}
+
+// ============================================================================
+// Notification Commands
+// ============================================================================
+
+/// Add a new notification
+#[tauri::command]
+fn notification_add(
+    priority: String,
+    category: String,
+    title: String,
+    message: String,
+    persistent: bool,
+    action_label: Option<String>,
+    action_id: Option<String>,
+    metadata: Option<serde_json::Value>,
+) -> Result<common::Notification, String> {
+    let priority = match priority.as_str() {
+        "system" => common::NotificationPriority::System,
+        "important" => common::NotificationPriority::Important,
+        "transient" => common::NotificationPriority::Transient,
+        _ => common::NotificationPriority::Default,
+    };
+    let category = match category.as_str() {
+        "admin" => common::NotificationCategory::Admin,
+        "security" => common::NotificationCategory::Security,
+        "account" => common::NotificationCategory::Account,
+        "update" => common::NotificationCategory::Update,
+        "upload" => common::NotificationCategory::Upload,
+        "error" => common::NotificationCategory::Error,
+        "success" => common::NotificationCategory::Success,
+        _ => common::NotificationCategory::Info,
+    };
+    common::add_notification(priority, category, title, message, persistent, action_label, action_id, metadata)
+}
+
+/// Get all notifications
+#[tauri::command]
+fn notification_get_all(include_dismissed: bool) -> Result<Vec<common::Notification>, String> {
+    common::get_notifications(None, include_dismissed)
+}
+
+/// Get unread notification count
+#[tauri::command]
+fn notification_get_unread_count() -> Result<usize, String> {
+    common::get_unread_count()
+}
+
+/// Mark a notification as read
+#[tauri::command]
+fn notification_mark_read(id: String) -> Result<(), String> {
+    common::mark_as_read(&id)
+}
+
+/// Mark all notifications as read
+#[tauri::command]
+fn notification_mark_all_read() -> Result<(), String> {
+    common::mark_all_as_read()
+}
+
+/// Dismiss a notification
+#[tauri::command]
+fn notification_dismiss(id: String) -> Result<(), String> {
+    common::dismiss_notification(&id)
+}
+
+/// Delete a notification permanently
+#[tauri::command]
+fn notification_delete(id: String) -> Result<(), String> {
+    common::delete_notification(&id)
+}
+
+/// Clear all notifications
+#[tauri::command]
+fn notification_clear_all(include_system: bool) -> Result<(), String> {
+    common::clear_notifications(include_system)
+}
+
+/// Check for system notifications on startup
+#[tauri::command]
+fn notification_check_system() -> Vec<common::Notification> {
+    common::check_system_notifications()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .plugin(tauri_plugin_clipboard_manager::init())
-        .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
-        .setup(|app| {
-            // Create system tray with menu
-            use tauri::menu::{Menu, MenuItem};
+    let mut builder = tauri::Builder::default();
+    
+    // Setup plugins
+    builder = desktop::app::setup_plugins(builder);
+    
+    // Setup the app
+    builder
+        .setup(|tauri_app| {
+            // Open devtools in debug builds to help with debugging
+            #[cfg(debug_assertions)]
+            {
+                if let Some(window) = tauri_app.get_webview_window("main") {
+                    window.open_devtools();
+                }
+            }
             
-            let show_item = MenuItem::with_id(app, "show", "Show Flicker", true, None::<&str>)?;
-            let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
-            
-            let _tray = tauri::tray::TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
-                .tooltip("Flicker - Click to open")
-                .menu(&menu)
-                .on_menu_event(|app, event| {
-                    match event.id.as_ref() {
-                        "show" => {
-                            if let Some(window) = app.get_webview_window("main") {
-                                let _ = window.show();
-                                let _ = window.unminimize();
-                                let _ = window.set_focus();
-                            }
-                        }
-                        "quit" => {
-                            app.exit(0);
-                        }
-                        _ => {}
-                    }
-                })
-                .on_tray_icon_event(|tray, event| {
-                    if let tauri::tray::TrayIconEvent::Click { button: tauri::tray::MouseButton::Left, .. } = event {
-                        let app = tray.app_handle();
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.unminimize();
-                            let _ = window.set_focus();
-                        }
-                    }
-                })
-                .build(app)?;
-            
-            // Handle window close to minimize to tray instead of quitting
-            if let Some(window) = app.get_webview_window("main") {
-                let window_clone = window.clone();
-                window.on_window_event(move |event| {
-                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                        // Prevent the window from closing, hide it instead
-                        api.prevent_close();
-                        let _ = window_clone.hide();
-                    }
-                });
+            // Setup system tray and window handlers (non-blocking)
+            #[cfg(not(mobile))]
+            {
+                desktop::app::setup_system_tray(tauri_app)?;
+                desktop::app::setup_window_handlers(tauri_app)?;
             }
             
             Ok(())
@@ -452,9 +550,38 @@ pub fn run() {
             get_monitors,
             get_monitor_at_point,
             upload_file,
+            upload_clipboard_image,
             screenshot_and_upload,
             get_system_info,
             get_screenshots_path,
+            get_test_image_path,
+            get_permission_status,
+            get_platform_capabilities,
+            load_config,
+            save_config,
+            load_history,
+            add_to_history,
+            clear_history,
+            emberly_login,
+            emberly_get_profile,
+            emberly_validate_token,
+            emberly_upload_file,
+            emberly_get_stats,
+            get_device_info,
+            get_audit_logs,
+            get_audit_logs_with_device,
+            export_audit_logs,
+            clear_audit_logs,
+            log_event,
+            notification_add,
+            notification_get_all,
+            notification_get_unread_count,
+            notification_mark_read,
+            notification_mark_all_read,
+            notification_dismiss,
+            notification_delete,
+            notification_clear_all,
+            notification_check_system,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

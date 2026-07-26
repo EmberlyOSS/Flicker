@@ -1,14 +1,16 @@
+import { AppConfig } from '../types';
+import { loadConfig } from '../config';
 import { useState, useEffect } from 'react';
-import { AppConfig, loadConfig } from '../config';
 
 export function useConfig() {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Load config synchronously from localStorage - this is fast
     try {
-      const loadedConfig = loadConfig();
-      setConfig(loadedConfig);
+      const loaded = loadConfig();
+      setConfig(loaded);
     } catch (error) {
       console.error('Failed to load config:', error);
     } finally {
@@ -16,5 +18,5 @@ export function useConfig() {
     }
   }, []);
 
-  return { config, isLoading };
+  return { config, isLoading, setConfig };
 }

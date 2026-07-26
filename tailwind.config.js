@@ -41,10 +41,15 @@ export default {
         input: 'hsl(var(--input) / <alpha-value>)',
         ring: 'hsl(var(--ring) / <alpha-value>)',
       },
+      fontFamily: {
+        sans: ['var(--font-family)', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'Fira Code', 'Consolas', 'monospace'],
+      },
       borderRadius: {
-        lg: 'calc(var(--radius, 0.5rem))',
-        md: 'calc(var(--radius, 0.5rem) - 2px)',
-        sm: 'calc(var(--radius, 0.5rem) - 4px)',
+        'xl': 'var(--radius)',
+        'lg': 'calc(var(--radius) * 0.75)',
+        'md': 'calc(var(--radius) * 0.5)',
+        'sm': 'calc(var(--radius) * 0.25)',
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
