@@ -43,6 +43,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   matching set.
 
 ### Fixed
+- The release workflow's build matrix ran fully in parallel with no shared
+  release step, so `tauri-action` raced to create a release for each job and
+  produced duplicate draft releases with a subset of assets each. A dedicated
+  `create-release` job now creates (or reuses) a single draft release first,
+  and matrix jobs upload into it by id.
+- The Windows-only `desktop::windows` module was compiled unconditionally on
+  every platform (no `cfg(target_os = "windows")` gate), breaking macOS and
+  Linux builds on code that uses `std::os::windows` APIs. Same fix applied to
+  the `macos`/`linux` sibling modules for consistency.
 - macOS and Linux builds referenced `libc::geteuid()` in the elevation-check
   code without declaring `libc` as a dependency for `cfg(unix)` targets,
   which would have failed to compile on those platforms. Added the missing

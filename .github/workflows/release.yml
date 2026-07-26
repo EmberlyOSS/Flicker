@@ -10,7 +10,51 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  # Create (or reuse) a single draft release first. Matrix build jobs below
+  # upload into this release by id instead of each trying to create their
+  # own - running them all in parallel without this step causes GitHub
+  # Actions to race and create duplicate draft releases.
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.release.outputs.result }}
+      tag_name: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version
+        id: version
+        run: |
+          VERSION=$(jq -r .version src-tauri/tauri.conf.json)
+          echo "tag=flicker-v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create or reuse draft release
+        id: release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = '${{ steps.version.outputs.tag }}';
+            const version = '${{ steps.version.outputs.version }}';
+            const { owner, repo } = context.repo;
+            try {
+              const { data } = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
+              return data.id;
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              const { data } = await github.rest.repos.createRelease({
+                owner,
+                repo,
+                tag_name: tag,
+                name: `Flicker v${version}`,
+                draft: true,
+                prerelease: false,
+              });
+              return data.id;
+            }
+
+  build:
+    needs: create-release
     strategy:
       fail-fast: false
       matrix:
@@ -56,7 +100,7 @@ jobs:
       - name: Install frontend dependencies
         run: bun install
 
-      - name: Build and release
+      - name: Build and upload
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -65,8 +109,5 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: flicker-v__VERSION__
-          releaseName: 'Flicker v__VERSION__'
-          releaseDraft: true
-          prerelease: false
+          releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.args }}
