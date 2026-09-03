@@ -19,8 +19,8 @@ export function PageLayout({ title, description, children, actions }: PageLayout
         {actions && <div className="flex items-center gap-2 flex-wrap">{actions}</div>}
       </div>
 
-      {/* Page Content */}
-      <div className="w-full overflow-hidden">{children}</div>
+      {/* Page Content — overflow-visible so filter dropdowns aren't clipped */}
+      <div className="w-full overflow-visible">{children}</div>
     </div>
   );
 }

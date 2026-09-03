@@ -45,7 +45,7 @@ export function MobileSidebar({
   return (
     <>
       {/* Mobile Header */}
-      <header className="mobile-header glass-elevated border-b border-border/40 rounded-none">
+      <header className="mobile-header glass-elevated border-b border-border/40 rounded-none relative z-30 sticky top-0">
         <div className="flex items-center justify-between px-4 py-3">
           {/* Logo and branding */}
           <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -114,14 +114,14 @@ export function MobileSidebar({
       {/* Mobile Menu Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setIsOpen(false)}
         />
       )}
 
       {/* Mobile Menu */}
       <nav
-        className={`mobile-menu glass-elevated border-b border-border/40 rounded-none fixed left-0 right-0 top-[60px] z-40 lg:hidden overflow-y-auto transition-all duration-300 ${
+        className={`mobile-menu glass-elevated border-b border-border/40 rounded-none fixed left-0 right-0 top-[60px] z-50 lg:hidden overflow-y-auto transition-all duration-300 ${
           isOpen ? 'max-h-[80vh] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
         }`}
       >

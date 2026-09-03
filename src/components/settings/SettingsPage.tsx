@@ -138,6 +138,14 @@ export function SettingsPage({
   const [perks, setPerks] = useState<PerksResponse | null>(null)
   const [perksLoaded, setPerksLoaded] = useState(false)
 
+  // macOS permissions — Screen Recording, Accessibility, Background
+  const [screenPermission, setScreenPermission] = useState<boolean | null>(null)
+  const [accessibilityPermission, setAccessibilityPermission] = useState<boolean | null>(null)
+  const [backgroundPermission, setBackgroundPermission] = useState<boolean | null>(null)
+  const [checkingPermission, setCheckingPermission] = useState(false)
+  const [checkingBackground, setCheckingBackground] = useState(false)
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform || (navigator as any).userAgent || '')
+
   useEffect(() => {
     if (activeTab === 'capture' && !domainsLoaded && config.uploadToken) {
       setDomainsLoaded(true)
@@ -161,6 +169,64 @@ export function SettingsPage({
         .catch((err) => console.error('Failed to load perks:', err))
     }
   }, [activeTab, perksLoaded, config.uploadToken, config.uploadUrl])
+
+  // Check permissions when entering capture tab (macOS)
+  useEffect(() => {
+    if (activeTab === 'capture' && (window as any).__TAURI_INTERNALS__) {
+      invoke<boolean>('check_screen_recording_permission').then(setScreenPermission).catch(() => setScreenPermission(null))
+      invoke<boolean>('check_accessibility_permission').then(setAccessibilityPermission).catch(() => setAccessibilityPermission(null))
+      invoke<boolean>('check_background_permission').then(setBackgroundPermission).catch(() => setBackgroundPermission(null))
+    }
+  }, [activeTab])
+
+  const handleCheckPermission = async () => {
+    setCheckingPermission(true)
+    try {
+      const has = await invoke<boolean>('check_screen_recording_permission')
+      setScreenPermission(has)
+      if (!has) {
+        const granted = await invoke<boolean>('request_screen_recording_permission').catch(() => false)
+        setScreenPermission(granted)
+      }
+      const acc = await invoke<boolean>('check_accessibility_permission').catch(() => null)
+      if (acc !== null) setAccessibilityPermission(acc as boolean)
+      const bg = await invoke<boolean>('check_background_permission').catch(() => null)
+      if (bg !== null) setBackgroundPermission(bg as boolean)
+    } catch (e) {
+      console.error('Permission check failed', e)
+    } finally {
+      setCheckingPermission(false)
+    }
+  }
+
+  const handleEnableBackground = async () => {
+    setCheckingBackground(true)
+    try {
+      const ok = await invoke<boolean>('enable_background')
+      setBackgroundPermission(ok)
+      if (!ok) {
+        await invoke('open_background_settings').catch(() => {})
+      }
+    } catch (e) {
+      console.error('Background enable failed', e)
+      await invoke('open_background_settings').catch(() => {})
+    } finally {
+      setCheckingBackground(false)
+    }
+  }
+
+  const handleRequestAccessibility = async () => {
+    setCheckingPermission(true)
+    try {
+      await invoke('request_accessibility_permission')
+      const has = await invoke<boolean>('check_accessibility_permission').catch(() => false)
+      setAccessibilityPermission(has as boolean)
+    } catch (e) {
+      console.error('Accessibility request failed', e)
+    } finally {
+      setCheckingPermission(false)
+    }
+  }
 
   const { currentTheme, switchTheme, presets } = useTheme()
   const { preferences: soundPrefs, savePreferences, playUploadSuccess, playUploadError, playCopyLink, playSettingsSave, loaded: soundsLoaded } = useSounds()
@@ -645,6 +711,131 @@ export function SettingsPage({
                 </div>
               </div>
             </SettingsSection>
+
+            {/* Permissions (macOS) — Screen Recording, Accessibility, Background */}
+            <SettingsSection icon={Shield} title="Permissions" description="System permissions for screenshots & background">
+              <div className="p-4 space-y-4 rounded-xl bg-secondary/30 border border-border/30">
+                {/* Screen Recording */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Screen Recording</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Required for region capture on macOS</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {screenPermission === null ? (
+                        <span className="text-xs text-muted-foreground">Unknown</span>
+                      ) : screenPermission ? (
+                        <span className="flex items-center gap-1.5 text-xs font-medium text-green-500">
+                          <span className="w-2 h-2 rounded-full bg-green-500" /> Granted
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1.5 text-xs font-medium text-amber-500">
+                          <span className="w-2 h-2 rounded-full bg-amber-500" /> Required
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {screenPermission === false && (
+                    <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                      <p className="text-xs text-amber-700 dark:text-amber-300">
+                        Flicker needs Screen Recording to capture regions when in background. Grant in <span className="font-medium">System Settings → Privacy & Security → Screen Recording</span> and restart.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Accessibility — for global shortcuts in background */}
+                <div className="space-y-2 pt-3 border-t border-border/30">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Accessibility</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">For global shortcuts when app is in background</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {accessibilityPermission === null ? (
+                        <span className="text-xs text-muted-foreground">Unknown</span>
+                      ) : accessibilityPermission ? (
+                        <span className="flex items-center gap-1.5 text-xs font-medium text-green-500">
+                          <span className="w-2 h-2 rounded-full bg-green-500" /> Granted
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1.5 text-xs font-medium text-amber-500">
+                          <span className="w-2 h-2 rounded-full bg-amber-500" /> Required
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {accessibilityPermission === false && (
+                    <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                      <p className="text-xs text-amber-700 dark:text-amber-300">
+                        Global shortcuts (e.g., {isMac ? '⌘+Shift+S' : 'Ctrl+Shift+S'}) need Accessibility to work while Flicker is hidden. Enable in <span className="font-medium">System Settings → Privacy & Security → Accessibility</span>.
+                      </p>
+                    </div>
+                  )}
+                  <button
+                    onClick={handleRequestAccessibility}
+                    disabled={checkingPermission}
+                    className="w-full py-2 rounded-lg bg-secondary/50 hover:bg-secondary text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {checkingPermission ? <Loader2 size={14} className="animate-spin" /> : <Shield size={14} />}
+                    {accessibilityPermission ? 'Re-check' : 'Open Accessibility Settings'}
+                  </button>
+                </div>
+
+                {/* Background App — keep running when window closed */}
+                <div className="space-y-2 pt-3 border-t border-border/30">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Run in Background</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Stay in tray & keep hotkeys alive after closing window</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {backgroundPermission === null ? (
+                        <span className="text-xs text-muted-foreground">Unknown</span>
+                      ) : backgroundPermission ? (
+                        <span className="flex items-center gap-1.5 text-xs font-medium text-green-500">
+                          <span className="w-2 h-2 rounded-full bg-green-500" /> Enabled
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1.5 text-xs font-medium text-amber-500">
+                          <span className="w-2 h-2 rounded-full bg-amber-500" /> Off
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {backgroundPermission === false && (
+                    <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                      <p className="text-xs text-amber-700 dark:text-amber-300">
+                        Enable “Run in Background” so Flicker stays in the menu bar and hotkeys work even after you close the window. On macOS this adds Flicker to <span className="font-medium">System Settings → General → Login Items → Allow in Background</span>.
+                      </p>
+                    </div>
+                  )}
+                  <button
+                    onClick={handleEnableBackground}
+                    disabled={checkingBackground}
+                    className="w-full py-2 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {checkingBackground ? <Loader2 size={14} className="animate-spin" /> : <Shield size={14} />}
+                    {backgroundPermission ? 'Re-check' : 'Enable Background & Open Settings'}
+                  </button>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleCheckPermission}
+                    disabled={checkingPermission}
+                    className="flex-1 py-2 rounded-lg bg-secondary/50 hover:bg-secondary text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {checkingPermission ? <Loader2 size={14} className="animate-spin" /> : <Shield size={14} />}
+                    Re-check All
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Tip: Region capture works system-wide — even when Flicker is hidden in the tray. Use <span className="font-mono text-xs bg-secondary/50 px-1.5 py-0.5 rounded border">{formData.hotkeys?.screenshotRegion ? formData.hotkeys.screenshotRegion.split('+').map(k => k === 'Super' ? (isMac ? '⌘' : 'Win') : k).join('+') : 'Control+Shift+X'}</span> anywhere. Single-click a window to capture it with tabs.
+                </p>
+              </div>
+            </SettingsSection>
           </div>
         )}
 
@@ -682,16 +873,18 @@ export function SettingsPage({
                   />
                 </div>
 
-                <div className="opacity-50">
+                <div>
                   <label className="block mb-2 text-sm font-medium text-muted-foreground">
-                    Region Screenshot <span className="text-xs">(Coming soon)</span>
+                    Region Screenshot
                   </label>
                   <HotkeyInput
                     value={formData.hotkeys?.screenshotRegion || ''}
                     onChange={(value) => handleHotkeyChange('screenshotRegion', value)}
-                    placeholder="Not yet implemented"
-                    disabled
+                    placeholder="e.g., Control+Shift+X"
                   />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Global overlay — works even when Flicker is in background. Click to capture screen, drag to select region. On macOS requires Screen Recording permission.
+                  </p>
                 </div>
 
                 <div>

@@ -5,7 +5,7 @@ const UPLOAD_HISTORY_KEY = 'emberly_uploader_history'
 
 export const DEFAULT_HOTKEYS: HotkeyConfig = {
   screenshotFullscreen: 'Control+Shift+S',
-  screenshotRegion: '',
+  screenshotRegion: 'Control+Shift+X',
   screenshotAllMonitors: 'Control+Shift+A',
   uploadClipboard: 'Control+Alt+U',
   openApp: '',

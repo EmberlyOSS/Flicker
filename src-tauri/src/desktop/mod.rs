@@ -2,6 +2,8 @@
 
 pub mod screenshot;
 pub mod app;
+pub mod region;
+pub mod hotkeys;
 
 #[cfg(target_os = "windows")]
 pub mod windows;

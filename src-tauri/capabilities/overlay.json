@@ -1,0 +1,34 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "overlay",
+  "description": "Capability for region overlay windows (system-wide capture)",
+  "windows": [
+    "region-overlay-*"
+  ],
+  "permissions": [
+    "core:default",
+    "core:window:default",
+    "core:window:allow-close",
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-set-size",
+    "core:window:allow-set-position",
+    "core:window:allow-set-always-on-top",
+    "core:window:allow-set-focus",
+    "core:window:allow-set-skip-taskbar",
+    "core:window:allow-inner-size",
+    "core:window:allow-inner-position",
+    "core:window:allow-start-dragging",
+    "core:event:default",
+    "core:event:allow-emit",
+    "core:event:allow-listen",
+    "opener:default",
+    "global-shortcut:default",
+    "clipboard-manager:default",
+    "clipboard-manager:allow-read-text",
+    "clipboard-manager:allow-write-text",
+    "clipboard-manager:allow-read-image",
+    "notification:default",
+    "notification:allow-notify"
+  ]
+}

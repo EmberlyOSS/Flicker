@@ -7,7 +7,7 @@ import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { BehaviorConfig, UploadProgress, UploadResponse } from '../../types'
 import { formatForClipboard } from '../../utils/clipboardFormat'
-import { Upload, Copy, Check, AlertCircle, Loader2, FileUp, Link2, X, RotateCcw, ExternalLink } from 'lucide-react'
+import { Upload, Copy, Check, AlertCircle, Loader2, FileUp, Link2, X, RotateCcw, ExternalLink, Crosshair } from 'lucide-react'
 import { API_URL } from '../../constants'
 
 interface UploadAreaProps {
@@ -17,6 +17,8 @@ interface UploadAreaProps {
   password?: string
   domain?: string
   behavior?: BehaviorConfig
+  /** Called when user clicks "Capture Region" — should show the region selector */
+  onCaptureRegion?: () => void
 }
 
 type FileStatus = 'uploading' | 'done' | 'error'
@@ -37,7 +39,7 @@ interface UploadProgressEvent extends UploadProgress {
   file_path: string
 }
 
-export function UploadArea({ onUpload, uploadToken, visibility, password, domain, behavior }: UploadAreaProps) {
+export function UploadArea({ onUpload, uploadToken, visibility, password, domain, behavior, onCaptureRegion }: UploadAreaProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [files, setFiles] = useState<QueuedFile[]>([])
   const [copiedId, setCopiedId] = useState<string | null>(null)
@@ -206,6 +208,17 @@ export function UploadArea({ onUpload, uploadToken, visibility, password, domain
             <Upload size={18} />
             Select Files
           </button>
+
+          {onCaptureRegion && (
+            <button
+              onClick={onCaptureRegion}
+              className="btn-secondary px-6 py-2.5 flex items-center gap-2 text-sm"
+              title="Select a region of the screen to capture and upload"
+            >
+              <Crosshair size={16} />
+              Capture Region
+            </button>
+          )}
 
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <kbd className="px-2 py-1 bg-secondary/50 rounded font-mono border border-border">

@@ -18,6 +18,7 @@ export function PageRouter() {
         updateConfig,
         handleLogout,
         setShowLogin,
+        takeRegionScreenshot,
     } = useApp()
 
     if (!config) return null
@@ -33,9 +34,11 @@ export function PageRouter() {
                         password={config.password}
                         domain={config.preferredDomain}
                         behavior={config.behavior}
+                        onCaptureRegion={takeRegionScreenshot}
                     />
                 </PageLayout>
             )
+
 
         case 'history':
             return (
