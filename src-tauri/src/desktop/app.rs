@@ -140,3 +140,9 @@ pub fn hide_window(app: &tauri::AppHandle) -> Result<(), String> {
 pub fn exit_app(app: &tauri::AppHandle) {
     app.exit(0);
 }
+
+/// Send OS notification — uses tauri plugin which correctly handles dev (Terminal) vs prod (Flicker)
+pub fn send_os_notification(app: &tauri::AppHandle, title: &str, body: &str) {
+    use tauri_plugin_notification::NotificationExt;
+    let _ = app.notification().builder().title(title).body(body).show();
+}

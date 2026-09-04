@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { MainLayout } from './components/layout';
 import { PageRouter } from './components/pages';
-import { LoginOverlay, ScreenshotToast, RegionSelector, GlobalRegionOverlay } from './components/overlays';
+import { LoginOverlay, ScreenshotToast, RegionSelector, GlobalRegionOverlay, PermissionsModal } from './components/overlays';
 import { SplashScreen } from './components/shared/SplashScreen';
 import './App.css';
 
@@ -55,7 +55,7 @@ function OverlayRouter() {
 }
 
 function AppContent() {
-  const { config, screenshotStatus, showRegionSelector, setShowRegionSelector, captureAndUploadRegion } = useApp();
+  const { config, screenshotStatus, showRegionSelector, setShowRegionSelector, captureAndUploadRegion, showPermissionsModal } = useApp();
   const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
@@ -74,6 +74,8 @@ function AppContent() {
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background">
       {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
+      {/* Soft-blocking permission onboarding — shows after splash if any macOS perm missing and not dismissed this session */}
+      {!showSplash && showPermissionsModal && <PermissionsModal />}
       <LoginOverlay />
 
       <MainLayout>

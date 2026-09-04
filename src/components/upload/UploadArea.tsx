@@ -7,7 +7,7 @@ import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { BehaviorConfig, UploadProgress, UploadResponse } from '../../types'
 import { formatForClipboard } from '../../utils/clipboardFormat'
-import { Upload, Copy, Check, AlertCircle, Loader2, FileUp, Link2, X, RotateCcw, ExternalLink, Crosshair } from 'lucide-react'
+import { Upload, Copy, Check, AlertCircle, Loader2, FileUp, Link2, X, RotateCcw, ExternalLink, Crosshair, Video, Square, Circle } from 'lucide-react'
 import { API_URL } from '../../constants'
 
 interface UploadAreaProps {
@@ -19,6 +19,9 @@ interface UploadAreaProps {
   behavior?: BehaviorConfig
   /** Called when user clicks "Capture Region" — should show the region selector */
   onCaptureRegion?: () => void
+  isVideoRecording?: boolean
+  videoElapsed?: number
+  onToggleVideo?: () => void
 }
 
 type FileStatus = 'uploading' | 'done' | 'error'
@@ -39,7 +42,7 @@ interface UploadProgressEvent extends UploadProgress {
   file_path: string
 }
 
-export function UploadArea({ onUpload, uploadToken, visibility, password, domain, behavior, onCaptureRegion }: UploadAreaProps) {
+export function UploadArea({ onUpload, uploadToken, visibility, password, domain, behavior, onCaptureRegion, isVideoRecording, videoElapsed, onToggleVideo }: UploadAreaProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [files, setFiles] = useState<QueuedFile[]>([])
   const [copiedId, setCopiedId] = useState<string | null>(null)
@@ -209,16 +212,38 @@ export function UploadArea({ onUpload, uploadToken, visibility, password, domain
             Select Files
           </button>
 
-          {onCaptureRegion && (
-            <button
-              onClick={onCaptureRegion}
-              className="btn-secondary px-6 py-2.5 flex items-center gap-2 text-sm"
-              title="Select a region of the screen to capture and upload"
-            >
-              <Crosshair size={16} />
-              Capture Region
-            </button>
-          )}
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {onCaptureRegion && (
+              <button
+                onClick={onCaptureRegion}
+                className="btn-secondary px-6 py-2.5 flex items-center gap-2 text-sm"
+                title="Select a region of the screen to capture and upload"
+              >
+                <Crosshair size={16} />
+                Capture Region
+              </button>
+            )}
+            {onToggleVideo && (
+              <button
+                onClick={onToggleVideo}
+                className={`px-6 py-2.5 flex items-center gap-2 text-sm font-medium rounded-xl border transition-all ${
+                  isVideoRecording
+                    ? 'bg-red-500 text-white border-red-600 animate-pulse'
+                    : 'btn-secondary'
+                }`}
+                title={isVideoRecording ? 'Stop recording (max 10m)' : 'Record screen to mp4 (Super+Shift+R)'}
+              >
+                {isVideoRecording ? <Square size={16} className="fill-white" /> : <Video size={16} />}
+                {isVideoRecording
+                  ? `Stop (${Math.floor((videoElapsed || 0) / 60)
+                      .toString()
+                      .padStart(2, '0')}:${((videoElapsed || 0) % 60).toString().padStart(2, '0')})`
+                  : 'Record Video'}
+                {!isVideoRecording && <span className="ml-1 text-[10px] opacity-70 hidden sm:inline">Super+Shift+R</span>}
+                {isVideoRecording && <Circle size={8} className="fill-white animate-ping ml-1" />}
+              </button>
+            )}
+          </div>
 
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <kbd className="px-2 py-1 bg-secondary/50 rounded font-mono border border-border">

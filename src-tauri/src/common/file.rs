@@ -43,6 +43,27 @@ pub fn generate_screenshot_filename(prefix: &str) -> String {
     format!("{}_{}{}.png", prefix, timestamp, uuid_short)
 }
 
+/// Get the recordings directory, creating it if it doesn't exist
+pub fn get_recordings_dir() -> Result<PathBuf, String> {
+    let base_dir = dirs::video_dir()
+        .or_else(dirs::picture_dir)
+        .or_else(dirs::home_dir)
+        .ok_or("Could not find video directory")?;
+    let recordings_dir = base_dir.join("Flicker Recordings");
+    if !recordings_dir.exists() {
+        std::fs::create_dir_all(&recordings_dir)
+            .map_err(|e| format!("Failed to create recordings directory: {}", e))?;
+    }
+    Ok(recordings_dir)
+}
+
+/// Generate a unique filename for a recording with timestamp and UUID
+pub fn generate_recording_filename() -> String {
+    let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+    let uuid_short = &Uuid::new_v4().to_string()[..8];
+    format!("Recording_{}{}.mp4", timestamp, uuid_short)
+}
+
 /// Save bytes to a file in the screenshots directory
 pub fn save_screenshot(filename: &str, data: &[u8]) -> Result<PathBuf, String> {
     let screenshots_dir = get_screenshots_dir()?;

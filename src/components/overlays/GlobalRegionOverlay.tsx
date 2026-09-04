@@ -218,21 +218,41 @@ export function GlobalRegionOverlay() {
   }, [])
 
   const handleSelect = useCallback(async (region: Region) => {
-    if (processingRef.current) return
+    console.log('[Flicker][Overlay] handleSelect region=', region, 'isTinyClick=', region.width < 5 || region.height < 5, 'monitorIndex=', monitorIndex);
+    if (processingRef.current) {
+      console.warn('[Flicker][Overlay] handleSelect blocked: already processing');
+      return
+    }
     processingRef.current = true
     setIsProcessing(true)
 
     const isTinyClick = region.width < 5 || region.height < 5
 
     try {
-      const config = loadConfig()
-      if (!config.uploadToken) {
-        await invoke('cancel_region_capture')
-        try { await sendNotification({ title: 'Not logged in', body: 'Please log in via main window first' }) } catch {}
-        return
-      }
+    // Overlay windows have isolated localStorage — token may be empty here even though main window is logged in.
+    // Try localStorage first, then fallback to Rust disk config (authoritative).
+    let config = loadConfig()
+    let token: string | null = config.uploadToken || null
+    let apiUrl = config.uploadUrl || 'https://embrly.ca'
+    let visibility = config.visibility || 'PUBLIC'
+    let domain = config.preferredDomain || null
+    if (!token) {
+      try {
+        const rustCfg: any = await invoke('load_config')
+        // Rust config uses snake_case: upload_token, upload_url
+        token = rustCfg.upload_token || rustCfg.uploadToken || rustCfg.upload_token?.trim() || null
+        apiUrl = rustCfg.upload_url || rustCfg.uploadUrl || apiUrl
+        visibility = rustCfg.visibility || visibility
+        // preferredDomain is not in Rust config yet, keep as is
+      } catch {}
+    }
+    if (!token) {
+      await invoke('cancel_region_capture')
+      try { await sendNotification({ title: 'Not logged in', body: 'Please log in via main window first' }) } catch {}
+      return
+    }
 
-      const scale = window.devicePixelRatio || 1
+    const scale = window.devicePixelRatio || 1
 
       // Single click without drag → capture the window under cursor (fixes Helium tabs not captured)
       // Drag → capture the selected region
@@ -244,10 +264,10 @@ export function GlobalRegionOverlay() {
           y: region.y,
           monitorIndex,
           scaleFactor: scale,
-          apiUrl: config.uploadUrl || 'https://embrly.ca',
-          uploadToken: config.uploadToken,
-          visibility: config.visibility || 'PUBLIC',
-          domain: config.preferredDomain || null,
+          apiUrl,
+          uploadToken: token,
+          visibility,
+          domain,
         })
       } else {
         // Use combined capture+upload command (handles closing overlay before capture internally)
@@ -259,10 +279,10 @@ export function GlobalRegionOverlay() {
           width: region.width,
           height: region.height,
           scaleFactor: scale,
-          apiUrl: config.uploadUrl || 'https://embrly.ca',
-          uploadToken: config.uploadToken,
-          visibility: config.visibility || 'PUBLIC',
-          domain: config.preferredDomain || null,
+          apiUrl,
+          uploadToken: token,
+          visibility,
+          domain,
         })
       }
 

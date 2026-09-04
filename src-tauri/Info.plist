@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>Flicker requires screen recording permission to take screenshots and record screen videos.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Flicker requires microphone access to record audio during screen video recordings.</string>
+    <key>NSAudioCaptureUsageDescription</key>
+    <string>Flicker requires system audio access to record your Mac's output audio (e.g., YouTube, games) during screen recordings. This is used only when you enable “System Audio” in video settings.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Flicker does not use the camera, but this description is included to support future features that may require it.</string>
+</dict>
+</plist>

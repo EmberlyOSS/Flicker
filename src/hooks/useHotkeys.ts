@@ -31,16 +31,22 @@ export function useHotkeys(options: UseHotkeysOptions) {
 
   // Take screenshot - calls Rust backend
   const takeScreenshot = useCallback(async (captureAll: boolean = false) => {
-    if (isCapturingRef.current) return;
+    console.log('[Flicker][JS] takeScreenshot called captureAll=', captureAll, 'isCapturing=', isCapturingRef.current);
+    if (isCapturingRef.current) {
+      console.warn('[Flicker][JS] takeScreenshot blocked: already capturing');
+      return;
+    }
 
     const opts = optionsRef.current;
+    console.log('[Flicker][JS] takeScreenshot opts enabled=', opts.enabled, 'token_len=', opts.uploadToken?.length, 'apiUrl=', opts.apiUrl);
     if (!opts.enabled || !opts.uploadToken) {
-      console.log('Hotkeys disabled or no upload token');
+      console.warn('[Flicker][JS] Hotkeys disabled or no upload token', { enabled: opts.enabled, token_len: opts.uploadToken?.length });
       return;
     }
 
     opts.onScreenshotStart?.();
     isCapturingRef.current = true;
+    console.log('[Flicker][JS] invoking screenshot_and_upload ...');
 
     try {
       // Let Rust handle everything
@@ -52,6 +58,7 @@ export function useHotkeys(options: UseHotkeysOptions) {
         captureAll,
         monitorIndex: null,
       });
+      console.log('[Flicker][JS] screenshot_and_upload success url=', result.url);
 
       if (result.url) {
         // Rust already handled clipboard + OS notification (works even when app hidden/backgrounded)
@@ -61,9 +68,10 @@ export function useHotkeys(options: UseHotkeysOptions) {
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      console.error('Screenshot error:', msg);
+      console.error('[Flicker][JS] Screenshot error:', msg, error);
       opts.onError?.(msg);
     } finally {
+      console.log('[Flicker][JS] takeScreenshot finally, clearing isCapturing');
       isCapturingRef.current = false;
     }
   }, []);
@@ -128,28 +136,33 @@ export function useHotkeys(options: UseHotkeysOptions) {
 
   /** Triggers the region selector overlay (via hotkey or button). Uses global system-wide overlay. */
   const takeRegionScreenshot = useCallback(async () => {
+    console.log('[Flicker][JS] takeRegionScreenshot called');
     // Try global overlay first (works even when app is in background / hidden)
     try {
       // Check macOS screen recording permission first
       try {
         const hasPermission = await invoke<boolean>('check_screen_recording_permission');
+        console.log('[Flicker][JS] check_screen_recording_permission ->', hasPermission);
         if (!hasPermission) {
           const granted = await invoke<boolean>('request_screen_recording_permission').catch(() => false);
+          console.log('[Flicker][JS] request_screen_recording_permission ->', granted);
           if (!granted) {
             const msg = 'Screen Recording permission required. Enable it in System Settings > Privacy & Security > Screen Recording and restart Flicker.';
-            console.warn(msg);
+            console.warn('[Flicker][JS]', msg);
             optionsRef.current.onError?.(msg);
             return;
           }
         }
       } catch (permErr) {
-        console.warn('Permission check failed, proceeding anyway', permErr);
+        console.warn('[Flicker][JS] Permission check failed, proceeding anyway', permErr);
       }
 
+      console.log('[Flicker][JS] invoking start_region_capture ...');
       await invoke('start_region_capture');
+      console.log('[Flicker][JS] start_region_capture success');
       return;
     } catch (e) {
-      console.error('Global region capture failed, trying in-app fallback', e);
+      console.error('[Flicker][JS] Global region capture failed, trying in-app fallback', e);
       const msg = e instanceof Error ? e.message : String(e);
       // If it's a permission error, don't fallback - show error
       if (msg.includes('Screen Recording') || msg.includes('permission')) {
@@ -157,6 +170,7 @@ export function useHotkeys(options: UseHotkeysOptions) {
         return;
       }
       // Fallback to in-app selector (for browser preview or if overlay creation failed)
+      console.log('[Flicker][JS] falling back to in-app RegionSelector');
       optionsRef.current.onShowRegionSelector?.();
     }
   }, []);
@@ -293,6 +307,24 @@ export function useHotkeys(options: UseHotkeysOptions) {
           console.error('Register failed:', regionHk, e);
         }
       }
+
+      // Register video record hotkey (Super+Shift+R)
+      const videoHk = (options.hotkeys as any)?.recordVideo;
+      if (videoHk && mounted) {
+        try {
+          if (!(await isRegistered(videoHk))) {
+            await register(videoHk, async (e) => {
+              if (e.state === 'Pressed') {
+                try { await invoke('toggle_video_recording'); } catch {}
+              }
+            });
+            registeredHotkeysRef.current.push(videoHk);
+            console.log('Registered:', videoHk);
+          }
+        } catch (e) {
+          console.error('Register failed:', videoHk, e);
+        }
+      }
     };
 
     registerHotkeys();
@@ -315,6 +347,7 @@ export function useHotkeys(options: UseHotkeysOptions) {
     options.hotkeys?.screenshotAllMonitors,
     options.hotkeys?.uploadClipboard,
     options.hotkeys?.screenshotRegion,
+    (options.hotkeys as any)?.recordVideo,
     takeFullscreenScreenshot,
     takeAllMonitorsScreenshot,
     uploadClipboardImage,

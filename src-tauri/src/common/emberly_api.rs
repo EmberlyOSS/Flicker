@@ -530,6 +530,126 @@ impl EmberlyCient {
             .map_err(|e| format!("Failed to parse upload response: {}", e))
     }
 
+    /// Chunked upload — initialize session
+    pub async fn init_chunked_upload(
+        &self,
+        token: &str,
+        filename: &str,
+        mime_type: &str,
+        size: u64,
+        domain: Option<String>,
+    ) -> Result<(String, u64), String> {
+        let url = format!("{}/api/files/chunks", self.base_url);
+        let mut body = serde_json::json!({
+            "filename": filename,
+            "mimeType": mime_type,
+            "size": size,
+        });
+        if let Some(d) = domain {
+            body["domain"] = serde_json::Value::String(d);
+        }
+        println!("[Flicker] init_chunked: POST {} body={} token_len={}", url, body, token.len());
+        let resp = self
+            .client
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", token))
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("Init chunked upload failed: {}", e))?;
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        println!("[Flicker] init_chunked resp status={} body={}", status, text);
+        if !status.is_success() {
+            return Err(format!("Init chunked failed {}: {}", status, text));
+        }
+        let json: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+        // Server may wrap in {success, data: {uploadId, partSize}} or return flat
+        let data = json.get("data").unwrap_or(&json);
+        let upload_id = data
+            .get("uploadId")
+            .or_else(|| data.get("upload_id"))
+            .or_else(|| json.get("uploadId"))
+            .or_else(|| json.get("upload_id"))
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| format!("Missing uploadId in init response: {}", json)) ?
+            .to_string();
+        let part_size = data
+            .get("partSize")
+            .or_else(|| data.get("part_size"))
+            .or_else(|| json.get("partSize"))
+            .or_else(|| json.get("part_size"))
+            .and_then(|v| v.as_u64())
+            .unwrap_or(5 * 1024 * 1024);
+        println!("[Flicker] init_chunked: uploadId={} partSize={} raw={}", upload_id, part_size, json);
+        Ok((upload_id, part_size))
+    }
+
+    pub async fn get_chunk_url(
+        &self,
+        token: &str,
+        upload_id: &str,
+        part_number: u32,
+    ) -> Result<String, String> {
+        let url = format!(
+            "{}/api/files/chunks/{}/part/{}",
+            self.base_url, upload_id, part_number
+        );
+        println!("[Flicker] get_chunk_url: GET {} part={}", url, part_number);
+        let resp = self
+            .client
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", token))
+            .send()
+            .await
+            .map_err(|e| format!("Get chunk URL failed: {}", e))?;
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        println!("[Flicker] get_chunk_url resp status={} body={}", status, text);
+        if !status.is_success() {
+            return Err(format!("Get chunk URL failed {}: {}", status, text));
+        }
+        let json: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+        let data = json.get("data").unwrap_or(&json);
+        data.get("url")
+            .or_else(|| json.get("url"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .ok_or_else(|| format!("Missing url in chunk response: {}", json))
+    }
+
+    pub async fn complete_chunked_upload(
+        &self,
+        token: &str,
+        upload_id: &str,
+        parts: Vec<serde_json::Value>,
+        expires_at: Option<String>,
+    ) -> Result<UploadResponse, String> {
+        let url = format!("{}/api/files/chunks/{}/complete", self.base_url, upload_id);
+        let mut body = serde_json::json!({ "parts": parts });
+        if let Some(exp) = expires_at {
+            body["expiresAt"] = serde_json::Value::String(exp);
+        }
+        let resp = self
+            .client
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", token))
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("Complete chunked failed: {}", e))?;
+        if !resp.status().is_success() {
+            return Err(format!(
+                "Complete chunked failed {}: {}",
+                resp.status(),
+                resp.text().await.unwrap_or_default()
+            ));
+        }
+        let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+        let data = json.get("data").ok_or("Missing data")?;
+        serde_json::from_value(data.clone()).map_err(|e| e.to_string())
+    }
+
     /// Delete a file from Emberly
     pub async fn delete_file(&self, token: &str, file_id: &str) -> Result<(), String> {
         let url = format!("{}/api/files/{}", self.base_url, file_id);

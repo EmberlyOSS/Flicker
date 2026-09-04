@@ -5,7 +5,6 @@
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder, Emitter};
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri_plugin_clipboard_manager::ClipboardExt as _;
-use tauri_plugin_notification::NotificationExt as _;
 
 static REGION_CAPTURING: AtomicBool = AtomicBool::new(false);
 static MAIN_WAS_VISIBLE: AtomicBool = AtomicBool::new(false);
@@ -69,6 +68,7 @@ pub fn cancel_region_capture(app: &AppHandle) -> Result<(), String> {
 
 /// Start region capture - creates fullscreen transparent overlay(s) covering all monitors
 pub async fn start_region_capture(app: AppHandle) -> Result<(), String> {
+    println!("[Flicker] start_region_capture invoked");
     // Permission check on macOS
     #[cfg(target_os = "macos")]
     {
@@ -373,12 +373,7 @@ pub async fn capture_region_and_upload(
         let _ = app.clipboard().write_text(event.url.clone());
 
         // OS notification (Rust side — guaranteed even when app hidden)
-        let _ = app
-            .notification()
-            .builder()
-            .title("Region Captured")
-            .body("URL copied to clipboard")
-            .show();
+        crate::desktop::app::send_os_notification(&app, "Region Captured", "URL copied to clipboard");
 
         // Emit to main window for in-app history/toast update
         if let Some(main) = app.get_webview_window("main") {
@@ -396,12 +391,7 @@ pub async fn capture_region_and_upload(
     REGION_CAPTURING.store(false, Ordering::SeqCst);
 
     if let Err(ref e) = result {
-        let _ = app
-            .notification()
-            .builder()
-            .title("Region Capture Failed")
-            .body(e.clone())
-            .show();
+        crate::desktop::app::send_os_notification(&app, "Region Capture Failed", e);
     }
 
     result
@@ -508,12 +498,7 @@ pub async fn capture_window_and_upload(
         });
 
         let _ = app.clipboard().write_text(event.url.clone());
-        let _ = app
-            .notification()
-            .builder()
-            .title("Window Captured")
-            .body("URL copied to clipboard")
-            .show();
+        crate::desktop::app::send_os_notification(&app, "Window Captured", "URL copied to clipboard");
 
         if let Some(main) = app.get_webview_window("main") {
             let _ = main.emit("region_upload_complete", &event);
@@ -530,7 +515,7 @@ pub async fn capture_window_and_upload(
     REGION_CAPTURING.store(false, Ordering::SeqCst);
 
     if let Err(ref e) = result {
-        let _ = app.notification().builder().title("Window Capture Failed").body(e.clone()).show();
+        crate::desktop::app::send_os_notification(&app, "Window Capture Failed", e);
     }
 
     result

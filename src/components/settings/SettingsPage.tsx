@@ -4,7 +4,7 @@ import {
   Save, Eye, EyeOff, User, LogOut, Palette, Keyboard,
   Bug, Info, Github, Heart, ExternalLink, Check,
   Camera, Volume2, Image, FileText, Moon, MousePointer, Loader2, Shield, Zap,
-  Copy, RefreshCw, Globe, Download, ChevronDown, Monitor, Trash2
+  Copy, RefreshCw, Globe, Download, ChevronDown, Monitor, Trash2, Video, Mic, Clock, Upload
 } from 'lucide-react'
 import { useTheme, ThemePreset } from '../../hooks/useTheme'
 import { DEFAULT_HOTKEYS } from '../../config'
@@ -836,6 +836,91 @@ export function SettingsPage({
                 </p>
               </div>
             </SettingsSection>
+
+            {/* Video Recording — native mp4, no ffmpeg, 10m max */}
+            <SettingsSection icon={Video} title="Video Recording" description="Native mp4 capture with system audio">
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div
+                    onClick={() => handleNestedChange('video', 'includeSystemAudio', !(formData.video?.includeSystemAudio ?? true))}
+                    className="flex items-center justify-between p-3 transition-colors cursor-pointer rounded-xl bg-secondary/30 hover:bg-secondary/50"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Volume2 size={16} className="text-muted-foreground" />
+                      <span className="text-sm text-foreground">System Audio</span>
+                    </div>
+                    <div className={`w-9 h-5 rounded-full p-0.5 transition-colors ${(formData.video?.includeSystemAudio ?? true) ? 'bg-primary' : 'bg-muted'}`}>
+                      <div className={`w-4 h-4 rounded-full bg-white transition-transform ${(formData.video?.includeSystemAudio ?? true) ? 'translate-x-4' : ''}`} />
+                    </div>
+                  </div>
+
+                  <div
+                    onClick={() => handleNestedChange('video', 'includeMic', !(formData.video?.includeMic ?? false))}
+                    className="flex items-center justify-between p-3 transition-colors cursor-pointer rounded-xl bg-secondary/30 hover:bg-secondary/50"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Mic size={16} className="text-muted-foreground" />
+                      <span className="text-sm text-foreground">Microphone</span>
+                    </div>
+                    <div className={`w-9 h-5 rounded-full p-0.5 transition-colors ${(formData.video?.includeMic ?? false) ? 'bg-primary' : 'bg-muted'}`}>
+                      <div className={`w-4 h-4 rounded-full bg-white transition-transform ${(formData.video?.includeMic ?? false) ? 'translate-x-4' : ''}`} />
+                    </div>
+                  </div>
+
+                  <div
+                    onClick={() => handleNestedChange('video', 'showClicks', !(formData.video?.showClicks ?? false))}
+                    className="flex items-center justify-between p-3 transition-colors cursor-pointer rounded-xl bg-secondary/30 hover:bg-secondary/50"
+                  >
+                    <div className="flex items-center gap-2">
+                      <MousePointer size={16} className="text-muted-foreground" />
+                      <span className="text-sm text-foreground">Click Highlight</span>
+                    </div>
+                    <div className={`w-9 h-5 rounded-full p-0.5 transition-colors ${(formData.video?.showClicks ?? false) ? 'bg-primary' : 'bg-muted'}`}>
+                      <div className={`w-4 h-4 rounded-full bg-white transition-transform ${(formData.video?.showClicks ?? false) ? 'translate-x-4' : ''}`} />
+                    </div>
+                  </div>
+
+                  <div
+                    onClick={() => handleNestedChange('video', 'autoUpload', !(formData.video?.autoUpload ?? true))}
+                    className="flex items-center justify-between p-3 transition-colors cursor-pointer rounded-xl bg-secondary/30 hover:bg-secondary/50"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Upload size={16} className="text-muted-foreground" />
+                      <span className="text-sm text-foreground">Auto Upload</span>
+                    </div>
+                    <div className={`w-9 h-5 rounded-full p-0.5 transition-colors ${(formData.video?.autoUpload ?? true) ? 'bg-primary' : 'bg-muted'}`}>
+                      <div className={`w-4 h-4 rounded-full bg-white transition-transform ${(formData.video?.autoUpload ?? true) ? 'translate-x-4' : ''}`} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground">FPS</label>
+                    <select
+                      value={formData.video?.fps || 30}
+                      onChange={(e) => handleNestedChange('video', 'fps', parseInt(e.target.value))}
+                      className="w-full px-4 py-2.5 bg-secondary/50 border border-border/50 rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    >
+                      <option value={15}>15 fps</option>
+                      <option value={30}>30 fps</option>
+                      <option value={60}>60 fps</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground">Max Duration</label>
+                    <div className="w-full px-4 py-2.5 bg-secondary/30 border border-border/50 rounded-xl text-foreground text-sm flex items-center gap-2">
+                      <Clock size={14} className="text-muted-foreground" />
+                      10 minutes (auto-stop)
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  Native recording via ScreenCaptureKit — no ffmpeg needed. Output is <span className="font-mono">mp4</span> (H.264) and chunked-uploads for large files. System audio is captured on macOS 13+ when permission granted.
+                </p>
+              </div>
+            </SettingsSection>
           </div>
         )}
 
@@ -883,7 +968,21 @@ export function SettingsPage({
                     placeholder="e.g., Control+Shift+X"
                   />
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Global overlay — works even when Flicker is in background. Click to capture screen, drag to select region. On macOS requires Screen Recording permission.
+                    Global overlay — works even when Flicker is in background. Click to capture window (with tabs), drag to select region. On macOS requires Screen Recording permission.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block mb-2 text-sm font-medium text-muted-foreground">
+                    Record Video (mp4, max 10m)
+                  </label>
+                  <HotkeyInput
+                    value={(formData.hotkeys as any)?.recordVideo || ''}
+                    onChange={(value) => handleHotkeyChange('recordVideo' as any, value)}
+                    placeholder={isMac ? 'e.g., ⌘+Shift+R' : 'e.g., Control+Shift+R'}
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Native recording with system audio (toggle above). Press again to stop. Auto-stops at 10 minutes.
                   </p>
                 </div>
 
