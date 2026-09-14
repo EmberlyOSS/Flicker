@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { register, unregister, isRegistered } from '@tauri-apps/plugin-global-shortcut';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { sendNotification } from '@tauri-apps/plugin-notification';
 import { UploadCompleteEvent, UploadResponse, HotkeyConfig } from '../types';
@@ -21,7 +20,6 @@ interface UseHotkeysOptions {
 
 export function useHotkeys(options: UseHotkeysOptions) {
   const isCapturingRef = useRef(false);
-  const registeredHotkeysRef = useRef<string[]>([]);
   const optionsRef = useRef(options);
 
   // Keep options ref updated
@@ -218,141 +216,11 @@ export function useHotkeys(options: UseHotkeysOptions) {
     }
   }, []);
 
-  // Register hotkeys with delay
-  useEffect(() => {
-    // Skip if not in Tauri or not enabled
-    if (typeof window === 'undefined') return;
-    if (!(window as any).__TAURI_INTERNALS__) return;
-    if (!options.enabled) return;
-    if (!options.hotkeys) return;
-
-    let mounted = true;
-
-    const registerHotkeys = async () => {
-      // Wait briefly for app to fully initialize — reduced from 1500ms to 400ms so
-      // global shortcuts are available even when app starts hidden/backgrounded
-      await new Promise(r => setTimeout(r, 400));
-      if (!mounted) return;
-
-      // Cleanup old hotkeys
-      for (const hk of registeredHotkeysRef.current) {
-        try {
-          if (await isRegistered(hk)) await unregister(hk);
-        } catch (e) {
-          console.warn('Unregister failed:', hk);
-        }
-      }
-      registeredHotkeysRef.current = [];
-
-      // Register fullscreen hotkey
-      const fullscreenHk = options.hotkeys?.screenshotFullscreen;
-      if (fullscreenHk && mounted) {
-        try {
-          if (!(await isRegistered(fullscreenHk))) {
-            await register(fullscreenHk, (e) => {
-              if (e.state === 'Pressed') takeFullscreenScreenshot();
-            });
-            registeredHotkeysRef.current.push(fullscreenHk);
-            console.log('Registered:', fullscreenHk);
-          }
-        } catch (e) {
-          console.error('Register failed:', fullscreenHk, e);
-        }
-      }
-
-      // Register all-monitors hotkey
-      const allMonitorsHk = options.hotkeys?.screenshotAllMonitors;
-      if (allMonitorsHk && mounted) {
-        try {
-          if (!(await isRegistered(allMonitorsHk))) {
-            await register(allMonitorsHk, (e) => {
-              if (e.state === 'Pressed') takeAllMonitorsScreenshot();
-            });
-            registeredHotkeysRef.current.push(allMonitorsHk);
-            console.log('Registered:', allMonitorsHk);
-          }
-        } catch (e) {
-          console.error('Register failed:', allMonitorsHk, e);
-        }
-      }
-
-      // Register clipboard-upload hotkey
-      const clipboardHk = options.hotkeys?.uploadClipboard;
-      if (clipboardHk && mounted) {
-        try {
-          if (!(await isRegistered(clipboardHk))) {
-            await register(clipboardHk, (e) => {
-              if (e.state === 'Pressed') uploadClipboardImage();
-            });
-            registeredHotkeysRef.current.push(clipboardHk);
-            console.log('Registered:', clipboardHk);
-          }
-        } catch (e) {
-          console.error('Register failed:', clipboardHk, e);
-        }
-      }
-
-      // Register region-capture hotkey
-      const regionHk = options.hotkeys?.screenshotRegion;
-      if (regionHk && mounted) {
-        try {
-          if (!(await isRegistered(regionHk))) {
-            await register(regionHk, (e) => {
-              if (e.state === 'Pressed') takeRegionScreenshot();
-            });
-            registeredHotkeysRef.current.push(regionHk);
-            console.log('Registered:', regionHk);
-          }
-        } catch (e) {
-          console.error('Register failed:', regionHk, e);
-        }
-      }
-
-      // Register video record hotkey (Super+Shift+R)
-      const videoHk = (options.hotkeys as any)?.recordVideo;
-      if (videoHk && mounted) {
-        try {
-          if (!(await isRegistered(videoHk))) {
-            await register(videoHk, async (e) => {
-              if (e.state === 'Pressed') {
-                try { await invoke('toggle_video_recording'); } catch {}
-              }
-            });
-            registeredHotkeysRef.current.push(videoHk);
-            console.log('Registered:', videoHk);
-          }
-        } catch (e) {
-          console.error('Register failed:', videoHk, e);
-        }
-      }
-    };
-
-    registerHotkeys();
-
-    return () => {
-      mounted = false;
-      // Cleanup
-      (async () => {
-        for (const hk of registeredHotkeysRef.current) {
-          try {
-            if (await isRegistered(hk)) await unregister(hk);
-          } catch { }
-        }
-        registeredHotkeysRef.current = [];
-      })();
-    };
-  }, [
-    options.enabled,
-    options.hotkeys?.screenshotFullscreen,
-    options.hotkeys?.screenshotAllMonitors,
-    options.hotkeys?.uploadClipboard,
-    options.hotkeys?.screenshotRegion,
-    (options.hotkeys as any)?.recordVideo,
-    takeFullscreenScreenshot,
-    takeAllMonitorsScreenshot,
-    uploadClipboardImage,
-    takeRegionScreenshot,
-  ]);
+  // Global shortcuts are registered by the Rust backend. Keeping a second
+  // registration here races the backend handler and can make one keypress
+  // start/stop a recording (or start two captures). The hook still exposes
+  // the capture functions for buttons and tray events, but intentionally does
+  // not register system-wide shortcuts in the webview.
 
   return { takeFullscreenScreenshot, takeAllMonitorsScreenshot, uploadClipboardImage, takeRegionScreenshot, captureAndUploadRegion };
 }

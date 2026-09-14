@@ -8,6 +8,15 @@ use tauri_plugin_clipboard_manager::ClipboardExt as _;
 
 static REGION_CAPTURING: AtomicBool = AtomicBool::new(false);
 static MAIN_WAS_VISIBLE: AtomicBool = AtomicBool::new(false);
+static MAIN_HIDDEN_BY_USER: AtomicBool = AtomicBool::new(false);
+
+pub fn mark_main_hidden_by_user() {
+    MAIN_HIDDEN_BY_USER.store(true, Ordering::SeqCst);
+}
+
+pub fn mark_main_shown() {
+    MAIN_HIDDEN_BY_USER.store(false, Ordering::SeqCst);
+}
 
 /// Check if any region overlay window is currently open
 pub fn is_overlay_open(app: &AppHandle) -> bool {
@@ -18,8 +27,20 @@ pub fn is_overlay_open(app: &AppHandle) -> bool {
 
 /// Hide main window before capture so Flicker itself is not included in the screenshot.
 /// Records whether it was visible so we can restore it afterwards.
+/// Never treats a minimized / user-hidden window as visible — those must stay
+/// hidden so background hotkeys never pop the main window open.
 pub fn hide_main_for_capture(app: &AppHandle) {
+    if MAIN_HIDDEN_BY_USER.load(Ordering::SeqCst) {
+        MAIN_WAS_VISIBLE.store(false, Ordering::SeqCst);
+        return;
+    }
     if let Some(main) = app.get_webview_window("main") {
+        let minimized = main.is_minimized().unwrap_or(false);
+        if minimized {
+            // Minimized windows live in the Dock — leave them there, don't pop.
+            MAIN_WAS_VISIBLE.store(false, Ordering::SeqCst);
+            return;
+        }
         if let Ok(visible) = main.is_visible() {
             if visible {
                 MAIN_WAS_VISIBLE.store(true, Ordering::SeqCst);
@@ -33,7 +54,9 @@ pub fn hide_main_for_capture(app: &AppHandle) {
 
 /// Restore main window if we hid it for capture.
 pub fn restore_main_after_capture(app: &AppHandle) {
-    if MAIN_WAS_VISIBLE.swap(false, Ordering::SeqCst) {
+    if MAIN_WAS_VISIBLE.swap(false, Ordering::SeqCst)
+        && !MAIN_HIDDEN_BY_USER.load(Ordering::SeqCst)
+    {
         if let Some(main) = app.get_webview_window("main") {
             let _ = main.show();
             let _ = main.unminimize();

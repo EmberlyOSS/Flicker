@@ -1,6 +1,6 @@
 /// Desktop platform app initialization and window management
 
-use tauri::{Manager, Emitter};
+use tauri::Manager;
 
 /// Initialize the system tray with menu and event handlers
 pub fn setup_system_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
@@ -22,6 +22,7 @@ pub fn setup_system_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error:
             match event.id.as_ref() {
                 "show" => {
                     if let Some(window) = app.get_webview_window("main") {
+                        crate::desktop::region::mark_main_shown();
                         let _ = window.show();
                         let _ = window.unminimize();
                         let _ = window.set_focus();
@@ -36,20 +37,15 @@ pub fn setup_system_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error:
                 "capture-screen" => {
                     let handle = app.clone();
                     tauri::async_runtime::spawn(async move {
-                        // Trigger fullscreen capture via main window emit
-                        if let Some(win) = handle.get_webview_window("main") {
-                            let _ = win.emit("tray_capture", serde_json::json!({"mode": "screen"}));
-                        }
-                        // Fallback: directly invoke screenshot_and_upload if possible
-                        // The main window's JS will handle tray_capture event
+                        // Fully backgrounded: capture+upload in Rust, no window/JS needed.
+                        // Stays hidden in menu bar, never pops the main window.
+                        crate::desktop::hotkeys::do_capture(handle, false).await;
                     });
                 }
                 "capture-all" => {
                     let handle = app.clone();
                     tauri::async_runtime::spawn(async move {
-                        if let Some(win) = handle.get_webview_window("main") {
-                            let _ = win.emit("tray_capture", serde_json::json!({"mode": "all"}));
-                        }
+                        crate::desktop::hotkeys::do_capture(handle, true).await;
                     });
                 }
                 "quit" => {
@@ -62,6 +58,7 @@ pub fn setup_system_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error:
             if let tauri::tray::TrayIconEvent::Click { button: tauri::tray::MouseButton::Left, .. } = event {
                 let app = tray.app_handle();
                 if let Some(window) = app.get_webview_window("main") {
+                    crate::desktop::region::mark_main_shown();
                     let _ = window.show();
                     let _ = window.unminimize();
                     let _ = window.set_focus();
@@ -81,6 +78,7 @@ pub fn setup_window_handlers(app: &mut tauri::App) -> Result<(), Box<dyn std::er
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 // Prevent the window from closing, hide it instead
                 api.prevent_close();
+                crate::desktop::region::mark_main_hidden_by_user();
                 let _ = window_clone.hide();
             }
         });
@@ -111,12 +109,14 @@ pub fn emit_event(
     event_name: &str,
     payload: impl serde::ser::Serialize,
 ) {
+    use tauri::Emitter;
     let _ = window.emit(event_name, &payload);
 }
 
 /// Show the main window
 pub fn show_window(app: &tauri::AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("main") {
+        crate::desktop::region::mark_main_shown();
         window.show()
             .map_err(|e| format!("Failed to show window: {}", e))?;
         window.unminimize()

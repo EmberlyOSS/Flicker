@@ -9,6 +9,17 @@ use screenshots::Screen;
 /// Capture a screenshot of the entire screen or specified monitor
 #[cfg(feature = "desktop")]
 pub async fn capture_screenshot(monitor_index: Option<usize>) -> Result<ScreenshotResult, String> {
+    // On macOS, prefer the native `screencapture` CLI — it's instant and avoids
+    // the screenshots-crate ScreenCaptureKit path that shows the recording
+    // indicator and can take seconds. Fall back to the crate on failure.
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(result) = capture_screenshot_macos_cli(monitor_index).await {
+            return Ok(result);
+        }
+        // Fall through to screenshots crate on failure
+    }
+
     let screens = Screen::all().map_err(|e| format!("Failed to get screens: {}", e))?;
     
     if screens.is_empty() {
@@ -37,6 +48,45 @@ pub async fn capture_screenshot(monitor_index: Option<usize>) -> Result<Screensh
         path: file_path.to_string_lossy().to_string(),
         width,
         height,
+    })
+}
+
+#[cfg(all(feature = "desktop", target_os = "macos"))]
+async fn capture_screenshot_macos_cli(
+    monitor_index: Option<usize>,
+) -> Result<ScreenshotResult, String> {
+    use std::process::Command;
+    let filename = file::generate_screenshot_filename("screenshot");
+    let screenshots_dir = file::get_screenshots_dir()?;
+    let file_path = screenshots_dir.join(&filename);
+    let path_str = file_path.to_string_lossy().to_string();
+
+    let mut cmd = Command::new("screencapture");
+    cmd.arg("-x");
+    match monitor_index {
+        None | Some(0) => {
+            cmd.arg("-m");
+        }
+        Some(idx) => {
+            // -D 1 is main, -D 2 secondary, etc.
+            cmd.arg(format!("-D{}", idx + 1));
+        }
+    }
+    cmd.arg(&path_str);
+    let output = cmd
+        .output()
+        .map_err(|e| format!("screencapture failed: {}", e))?;
+    if !output.status.success() {
+        return Err(format!(
+            "screencapture failed: {:?}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    let img = image::open(&file_path).map_err(|e| format!("Failed to open capture: {}", e))?;
+    Ok(ScreenshotResult {
+        path: path_str,
+        width: img.width(),
+        height: img.height(),
     })
 }
 

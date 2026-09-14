@@ -919,6 +919,13 @@ pub fn run() {
             // Setup system tray and window handlers (non-blocking)
             #[cfg(not(mobile))]
             {
+                // Run as menu-bar (accessory) app on macOS so Flicker lives in the
+                // menu bar / tray, not the Dock. LSUIElement in Info.plist covers
+                // the bundled app; this covers `tauri dev` too.
+                #[cfg(target_os = "macos")]
+                {
+                    let _ = tauri_app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+                }
                 desktop::app::setup_system_tray(tauri_app)?;
                 desktop::app::setup_window_handlers(tauri_app)?;
                 // Register global hotkeys in Rust so captures work even when main window is hidden/backgrounded

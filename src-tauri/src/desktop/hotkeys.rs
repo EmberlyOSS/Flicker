@@ -19,8 +19,24 @@ pub fn reregister_hotkeys(app: &AppHandle) -> Result<(), String> {
         config.hotkeys.screenshot_fullscreen, config.hotkeys.screenshot_region, config.hotkeys.screenshot_all_monitors, config.hotkeys.upload_clipboard, config.hotkeys.record_video, config.upload_token.len());
     let hk = config.hotkeys;
 
+    // Guard against the same accelerator being assigned to multiple actions
+    // (one press would otherwise fire screenshot AND video, looking like it
+    // needs "press twice"). First registration wins.
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut claim = |name: &str, shortcut: &str| -> bool {
+        let key = shortcut.trim().to_lowercase();
+        if key.is_empty() {
+            return false;
+        }
+        if !seen.insert(key) {
+            eprintln!("[Flicker] hotkey '{}' ({}) already registered — skipping duplicate", shortcut, name);
+            return false;
+        }
+        true
+    };
+
     // Fullscreen
-    if !hk.screenshot_fullscreen.trim().is_empty() {
+    if claim("fullscreen", &hk.screenshot_fullscreen) {
         let app_c = app.clone();
         let shortcut = hk.screenshot_fullscreen.clone();
         println!("[Flicker] registering fullscreen hotkey: '{}'", shortcut);
@@ -40,7 +56,7 @@ pub fn reregister_hotkeys(app: &AppHandle) -> Result<(), String> {
     }
 
     // All monitors
-    if !hk.screenshot_all_monitors.trim().is_empty() {
+    if claim("all-monitors", &hk.screenshot_all_monitors) {
         let app_c = app.clone();
         let shortcut = hk.screenshot_all_monitors.clone();
         println!("[Flicker] registering all-monitors hotkey: '{}'", shortcut);
@@ -60,7 +76,7 @@ pub fn reregister_hotkeys(app: &AppHandle) -> Result<(), String> {
     }
 
     // Region
-    if !hk.screenshot_region.trim().is_empty() {
+    if claim("region", &hk.screenshot_region) {
         let app_c = app.clone();
         let shortcut = hk.screenshot_region.clone();
         println!("[Flicker] registering region hotkey: '{}'", shortcut);
@@ -81,7 +97,7 @@ pub fn reregister_hotkeys(app: &AppHandle) -> Result<(), String> {
     }
 
     // Clipboard upload
-    if !hk.upload_clipboard.trim().is_empty() {
+    if claim("clipboard", &hk.upload_clipboard) {
         let app_c = app.clone();
         let shortcut = hk.upload_clipboard.clone();
         println!("[Flicker] registering clipboard hotkey: '{}'", shortcut);
@@ -102,7 +118,7 @@ pub fn reregister_hotkeys(app: &AppHandle) -> Result<(), String> {
 
     // Video recording — same hotkey toggles start/stop and auto-uploads mp4 (10m max)
     let video_hk = hk.record_video.clone();
-    if !video_hk.trim().is_empty() {
+    if claim("video", &video_hk) {
         let app_c = app.clone();
         println!("[Flicker] registering video hotkey: '{}'", video_hk);
         let res = app.global_shortcut().on_shortcut(video_hk.as_str(), move |_app, _sc, event| {
@@ -124,7 +140,7 @@ pub fn reregister_hotkeys(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-async fn do_capture(app: AppHandle, capture_all: bool) {
+pub async fn do_capture(app: AppHandle, capture_all: bool) {
     // Guard against concurrent captures (reuse lib's static)
     // Use a simple file or just try; the lib's screenshot_and_upload already has guard,
     // but we implement direct capture here without that guard — use our own.
@@ -168,7 +184,10 @@ async fn do_capture(app: AppHandle, capture_all: bool) {
             },
         )
         .await;
-        crate::desktop::region::restore_main_after_capture(&app);
+        // Background hotkey: stay hidden. Never auto-show the main window here —
+        // the user triggered this from another app and Flicker popping open is
+        // exactly what we want to avoid. Tray "Show Flicker" reopens explicitly.
+        // (Foreground in-app captures via `screenshot_and_upload` still restore.)
         let screenshot = capture_res
             .map_err(|_| "Screenshot capture timed out — check Screen Recording permission".to_string())??;
 

@@ -166,9 +166,9 @@ impl Default for HotkeyConfig {
     fn default() -> Self {
         Self {
             screenshot_fullscreen: "Control+Shift+S".to_string(),
-            screenshot_region: String::new(),
+            screenshot_region: "Control+Shift+X".to_string(),
             screenshot_all_monitors: "Control+Shift+A".to_string(),
-            upload_clipboard: String::new(),
+            upload_clipboard: "Control+Alt+U".to_string(),
             open_app: String::new(),
             record_video: "Super+Shift+R".to_string(),
         }
