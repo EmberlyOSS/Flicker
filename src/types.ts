@@ -17,6 +17,7 @@ export interface AppConfig {
   appearance?: AppearanceConfig
   behavior?: BehaviorConfig
   capture?: CaptureConfig
+  video?: VideoConfig
 }
 
 export interface AppearanceConfig {
@@ -55,6 +56,15 @@ export interface CaptureConfig {
   includeCursor: boolean
 }
 
+export interface VideoConfig {
+  includeSystemAudio: boolean // default true
+  includeMic: boolean // default false
+  showClicks: boolean
+  fps: number // 30
+  maxDurationSecs: number // 600 (10m)
+  autoUpload: boolean
+}
+
 export type ScreenshotMode = 'primary' | 'active' | 'all'
 
 export interface HotkeyConfig {
@@ -63,6 +73,7 @@ export interface HotkeyConfig {
   screenshotAllMonitors: string // e.g., "Ctrl+Shift+A"
   uploadClipboard: string // e.g., "Ctrl+Alt+U"
   openApp: string // e.g., "Ctrl+Alt+E"
+  recordVideo: string // e.g., Super+Shift+R
 }
 
 export interface AuthenticatedUser {

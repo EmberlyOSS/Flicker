@@ -5,10 +5,11 @@ const UPLOAD_HISTORY_KEY = 'emberly_uploader_history'
 
 export const DEFAULT_HOTKEYS: HotkeyConfig = {
   screenshotFullscreen: 'Control+Shift+S',
-  screenshotRegion: '',
+  screenshotRegion: 'Control+Shift+X',
   screenshotAllMonitors: 'Control+Shift+A',
   uploadClipboard: 'Control+Alt+U',
   openApp: '',
+  recordVideo: 'Super+Shift+R',
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -45,6 +46,14 @@ const DEFAULT_CONFIG: AppConfig = {
     filenamePattern: 'Screenshot_%Y-%m-%d_%H-%M-%S',
     saveLocally: false,
     includeCursor: true,
+  },
+  video: {
+    includeSystemAudio: true,
+    includeMic: false,
+    showClicks: false,
+    fps: 30,
+    maxDurationSecs: 600,
+    autoUpload: true,
   },
 }
 

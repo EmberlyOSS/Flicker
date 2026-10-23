@@ -177,40 +177,50 @@ function PreviewModal({
           </button>
         </div>
         
-        {/* Content */}
-        <div className="p-6 flex items-center justify-center min-h-[300px] max-h-[60vh] overflow-auto bg-black/20">
+        {/* Content - image at exact 1:1 dimensions, scrollable if larger than viewport */}
+        <div className="overflow-auto bg-black/30 max-h-[65vh]">
           {category === 'image' && (
-            <img 
-              src={previewUrl} 
-              alt={item.name}
-              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
-            />
+            <div className="p-6 flex justify-center">
+              <img 
+                src={previewUrl} 
+                alt={item.name}
+                className="block rounded-lg shadow-2xl max-w-none max-h-none"
+                style={{ width: 'auto', height: 'auto', imageRendering: 'auto' }}
+                draggable={false}
+              />
+            </div>
           )}
           {category === 'video' && (
-            <video 
-              src={previewUrl} 
-              controls 
-              className="max-w-full max-h-full rounded-lg shadow-2xl"
-            />
+            <div className="p-6 flex justify-center">
+              <video 
+                src={previewUrl} 
+                controls 
+                className="max-w-full rounded-lg shadow-2xl"
+              />
+            </div>
           )}
           {category === 'audio' && (
-            <div className="w-full max-w-md space-y-4 text-center">
-              <div className="w-24 h-24 mx-auto rounded-2xl bg-gradient-to-br from-green-500/20 to-green-500/5 flex items-center justify-center border border-green-500/20">
-                <Music className="w-12 h-12 text-green-400" />
+            <div className="p-6 flex justify-center">
+              <div className="w-full max-w-md space-y-4 text-center">
+                <div className="w-24 h-24 mx-auto rounded-2xl bg-gradient-to-br from-green-500/20 to-green-500/5 flex items-center justify-center border border-green-500/20">
+                  <Music className="w-12 h-12 text-green-400" />
+                </div>
+                <p className="text-foreground font-medium">{item.name}</p>
+                <audio src={previewUrl} controls className="w-full" />
               </div>
-              <p className="text-foreground font-medium">{item.name}</p>
-              <audio src={previewUrl} controls className="w-full" />
             </div>
           )}
           {(category === 'document' || category === 'other') && (
-            <div className="text-center space-y-4">
-              <div className="w-24 h-24 mx-auto rounded-2xl bg-secondary/50 flex items-center justify-center border border-border/30">
-                <FileIcon category={category} size={48} />
+            <div className="p-6 flex justify-center">
+              <div className="text-center space-y-4">
+                <div className="w-24 h-24 mx-auto rounded-2xl bg-secondary/50 flex items-center justify-center border border-border/30">
+                  <FileIcon category={category} size={48} />
+                </div>
+                <p className="text-foreground font-medium">{item.name}</p>
+                <p className="text-sm text-muted-foreground">
+                  Preview not available for this file type
+                </p>
               </div>
-              <p className="text-foreground font-medium">{item.name}</p>
-              <p className="text-sm text-muted-foreground">
-                Preview not available for this file type
-              </p>
             </div>
           )}
         </div>
@@ -531,8 +541,8 @@ export function UploadHistory({ history, onCopy, onDelete, clipboardFormat, uplo
 
   return (
     <div className="space-y-4">
-      {/* Search and Controls */}
-      <div className="glass-card p-4 space-y-3 border border-border/30 relative z-50">
+      {/* Search and Controls — z-10 so it stays below the mobile menu (z-40/50) when opened */}
+      <div className="glass-card p-4 space-y-3 border border-border/30 relative z-10">
         {/* Search Bar */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -568,7 +578,7 @@ export function UploadHistory({ history, onCopy, onDelete, clipboardFormat, uplo
           {/* Sort & View Controls */}
           <div className="flex items-center gap-2">
             {/* Sort Dropdown */}
-            <div className="relative z-50">
+            <div className="relative">
               <button
                 onClick={() => setShowFilters(!showFilters)}
                 className="flex items-center gap-2 px-3 py-1.5 bg-secondary/30 hover:bg-secondary/50 rounded-lg text-xs font-medium text-foreground transition-all border border-border/30"
@@ -580,10 +590,10 @@ export function UploadHistory({ history, onCopy, onDelete, clipboardFormat, uplo
               {showFilters && (
                 <>
                   <div 
-                    className="fixed inset-0 z-[60]" 
+                    className="fixed inset-0 z-20" 
                     onClick={() => setShowFilters(false)}
                   />
-                  <div className="absolute right-0 top-full mt-2 w-48 glass-card border border-border/50 rounded-lg shadow-xl z-[70] overflow-hidden">
+                  <div className="absolute right-0 top-full mt-2 w-48 glass-card border border-border/50 rounded-lg shadow-xl z-30 overflow-hidden">
                   {[
                     { value: 'newest', label: 'Newest First', icon: <Calendar className="w-3.5 h-3.5" /> },
                     { value: 'oldest', label: 'Oldest First', icon: <Calendar className="w-3.5 h-3.5" /> },

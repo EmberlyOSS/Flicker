@@ -3,7 +3,8 @@
   "identifier": "default",
   "description": "Capability for the main window",
   "windows": [
-    "main"
+    "main",
+    "region-overlay-*"
   ],
   "permissions": [
     "core:default",
@@ -12,6 +13,14 @@
     "core:window:allow-minimize",
     "core:window:allow-start-dragging",
     "core:window:allow-set-focus",
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-set-size",
+    "core:window:allow-set-position",
+    "core:window:allow-set-always-on-top",
+    "core:window:allow-inner-size",
+    "core:window:allow-inner-position",
+    "core:window:allow-set-skip-taskbar",
     "core:app:default",
     "opener:default",
     "dialog:default",
@@ -34,6 +43,10 @@
     "updater:allow-check",
     "updater:allow-download",
     "updater:allow-install",
+    "autostart:default",
+    "autostart:allow-enable",
+    "autostart:allow-disable",
+    "autostart:allow-is-enabled",
     "fs:default",
     "fs:allow-read-text-file",
     "fs:allow-write-text-file",
