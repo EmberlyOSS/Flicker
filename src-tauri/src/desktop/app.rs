@@ -1,14 +1,18 @@
 /// Desktop platform app initialization and window management
 
-use tauri::{Manager, Emitter};
+use tauri::Manager;
 
 /// Initialize the system tray with menu and event handlers
 pub fn setup_system_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-    use tauri::menu::{Menu, MenuItem};
+    use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
     
     let show_item = MenuItem::with_id(app, "show", "Show Flicker", true, None::<&str>)?;
+    let capture_region_item = MenuItem::with_id(app, "capture-region", "Capture Region", true, None::<&str>)?;
+    let capture_screen_item = MenuItem::with_id(app, "capture-screen", "Capture Screen", true, None::<&str>)?;
+    let capture_all_item = MenuItem::with_id(app, "capture-all", "Capture All Monitors", true, None::<&str>)?;
+    let separator = PredefinedMenuItem::separator(app)?;
     let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+    let menu = Menu::with_items(app, &[&show_item, &capture_region_item, &capture_screen_item, &capture_all_item, &separator, &quit_item])?;
     
     let _tray = tauri::tray::TrayIconBuilder::new()
         .icon(app.default_window_icon().unwrap().clone())
@@ -18,10 +22,31 @@ pub fn setup_system_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error:
             match event.id.as_ref() {
                 "show" => {
                     if let Some(window) = app.get_webview_window("main") {
+                        crate::desktop::region::mark_main_shown();
                         let _ = window.show();
                         let _ = window.unminimize();
                         let _ = window.set_focus();
                     }
+                }
+                "capture-region" => {
+                    let handle = app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let _ = crate::desktop::region::start_region_capture(handle).await;
+                    });
+                }
+                "capture-screen" => {
+                    let handle = app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        // Fully backgrounded: capture+upload in Rust, no window/JS needed.
+                        // Stays hidden in menu bar, never pops the main window.
+                        crate::desktop::hotkeys::do_capture(handle, false).await;
+                    });
+                }
+                "capture-all" => {
+                    let handle = app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        crate::desktop::hotkeys::do_capture(handle, true).await;
+                    });
                 }
                 "quit" => {
                     app.exit(0);
@@ -33,6 +58,7 @@ pub fn setup_system_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error:
             if let tauri::tray::TrayIconEvent::Click { button: tauri::tray::MouseButton::Left, .. } = event {
                 let app = tray.app_handle();
                 if let Some(window) = app.get_webview_window("main") {
+                    crate::desktop::region::mark_main_shown();
                     let _ = window.show();
                     let _ = window.unminimize();
                     let _ = window.set_focus();
@@ -52,6 +78,7 @@ pub fn setup_window_handlers(app: &mut tauri::App) -> Result<(), Box<dyn std::er
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 // Prevent the window from closing, hide it instead
                 api.prevent_close();
+                crate::desktop::region::mark_main_hidden_by_user();
                 let _ = window_clone.hide();
             }
         });
@@ -70,6 +97,10 @@ pub fn setup_plugins(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<taur
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
 }
 
 /// Emit an event to the frontend
@@ -78,12 +109,14 @@ pub fn emit_event(
     event_name: &str,
     payload: impl serde::ser::Serialize,
 ) {
+    use tauri::Emitter;
     let _ = window.emit(event_name, &payload);
 }
 
 /// Show the main window
 pub fn show_window(app: &tauri::AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("main") {
+        crate::desktop::region::mark_main_shown();
         window.show()
             .map_err(|e| format!("Failed to show window: {}", e))?;
         window.unminimize()
@@ -106,4 +139,10 @@ pub fn hide_window(app: &tauri::AppHandle) -> Result<(), String> {
 /// Exit the application
 pub fn exit_app(app: &tauri::AppHandle) {
     app.exit(0);
+}
+
+/// Send OS notification — uses tauri plugin which correctly handles dev (Terminal) vs prod (Flicker)
+pub fn send_os_notification(app: &tauri::AppHandle, title: &str, body: &str) {
+    use tauri_plugin_notification::NotificationExt;
+    let _ = app.notification().builder().title(title).body(body).show();
 }

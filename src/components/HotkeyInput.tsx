@@ -8,12 +8,17 @@ interface HotkeyInputProps {
   disabled?: boolean
 }
 
+// Platform detection for proper modifier display
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform || (navigator as any).userAgent || '')
+
 // Map browser key codes to Tauri shortcut format
+// On macOS, Meta (Command) should be stored as "Super" which global_hotkey maps to Command,
+// but we display it as "⌘" for familiarity.
 const KEY_MAP: Record<string, string> = {
   'Control': 'Control',
   'Shift': 'Shift',
   'Alt': 'Alt',
-  'Meta': 'Super', // Windows key
+  'Meta': 'Super',
   'PrintScreen': 'PrintScreen',
   'Escape': 'Escape',
   'Enter': 'Return',
@@ -36,8 +41,19 @@ const KEY_MAP: Record<string, string> = {
   'F9': 'F9', 'F10': 'F10', 'F11': 'F11', 'F12': 'F12',
 }
 
-// Modifiers in order they should appear
-const MODIFIER_ORDER = ['Control', 'Shift', 'Alt', 'Super']
+// Modifiers in order they should appear — Super (Cmd) first on macOS for natural reading
+const MODIFIER_ORDER = isMac ? ['Super', 'Control', 'Shift', 'Alt'] : ['Control', 'Shift', 'Alt', 'Super']
+
+// Display name for modifiers (macOS shows ⌘ instead of Super)
+function displayModifier(mod: string): string {
+  if (isMac) {
+    if (mod === 'Super') return '⌘'
+    if (mod === 'Control') return '⌃'
+    if (mod === 'Alt') return '⌥'
+    if (mod === 'Shift') return '⇧'
+  }
+  return mod
+}
 
 function normalizeKey(key: string, code: string): string | null {
   // Handle modifiers - they shouldn't be standalone
@@ -154,9 +170,15 @@ export function HotkeyInput({ value, onChange, placeholder, disabled }: HotkeyIn
     setCurrentKeys(new Set())
   }
 
+  // Convert stored value to display-friendly (Super → ⌘ on mac)
+  const formatDisplayValue = (val: string) => {
+    if (!val) return ''
+    return val.split('+').map(p => displayModifier(p.trim())).join(' + ')
+  }
+
   const displayValue = isRecording
-    ? (currentKeys.size > 0 ? Array.from(currentKeys).join(' + ') : 'Press keys...')
-    : (value || placeholder || 'Click to record')
+    ? (currentKeys.size > 0 ? Array.from(currentKeys).map(displayModifier).join(' + ') : 'Press keys...')
+    : (value ? formatDisplayValue(value) : (placeholder || 'Click to record'))
 
   return (
     <div className="relative">
@@ -176,10 +198,10 @@ export function HotkeyInput({ value, onChange, placeholder, disabled }: HotkeyIn
           ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
         `}
       >
-        <div className="flex items-center gap-2 flex-1">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
           <Keyboard size={16} className={isRecording ? 'text-primary' : 'text-muted-foreground'} />
           <span className={`
-            ${isRecording ? 'text-primary animate-pulse' : value ? 'text-foreground' : 'text-muted-foreground'}
+            truncate ${isRecording ? 'text-primary animate-pulse' : value ? 'text-foreground' : 'text-muted-foreground'}
           `}>
             {displayValue}
           </span>
@@ -215,18 +237,18 @@ export function HotkeyInput({ value, onChange, placeholder, disabled }: HotkeyIn
       
       {isRecording && (
         <p className="text-xs text-primary mt-1 animate-pulse">
-          Press a key combination (e.g., Ctrl+Shift+S)
+          Press a key combination (e.g., {isMac ? '⌘+Shift+S' : 'Ctrl+Shift+S'})
         </p>
       )}
     </div>
   )
 }
 
-// Display a hotkey in a nice badge format
+// Display a hotkey in a nice badge format — shows ⌘ on macOS
 export function HotkeyBadge({ shortcut, className }: { shortcut: string; className?: string }) {
   if (!shortcut) return null
   
-  const keys = shortcut.split('+')
+  const keys = shortcut.split('+').map(k => displayModifier(k.trim()))
   
   return (
     <div className={`flex items-center gap-1 ${className}`}>

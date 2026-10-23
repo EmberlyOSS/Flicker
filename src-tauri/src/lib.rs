@@ -8,11 +8,16 @@ pub mod platform;
 pub mod desktop;
 pub mod mobile;
 
-use tauri::Manager;
+use tauri::{Emitter as _, Manager};
 use common::{
     ScreenshotResult, UploadCompleteEvent, UploadResponse,
     get_screenshots_dir,
 };
+use tauri_plugin_clipboard_manager::ClipboardExt as _;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+/// Global guard to prevent concurrent screenshot captures (fixes spam on rapid triggers)
+static SCREENSHOT_CAPTURING: AtomicBool = AtomicBool::new(false);
 
 // Platform-specific screenshot module
 #[cfg(feature = "desktop")]
@@ -107,8 +112,21 @@ async fn upload_file(
     .await?;
 
     // Emit success event with file path for preview
-    let event = common::create_upload_event(response.clone(), Some(file_path));
+    let event = common::create_upload_event(response.clone(), Some(file_path.clone()));
     desktop::app::emit_event(&window, "upload_complete", &event);
+    // Also ensure OS notification + history + clipboard even when app hidden (like other upload paths)
+    let app_handle = window.app_handle();
+    let _ = app_handle.clipboard().write_text(event.url.clone());
+    desktop::app::send_os_notification(&app_handle, "Upload Complete", "URL copied to clipboard");
+    let _ = common::add_to_history(common::UploadHistoryItem {
+        url: event.url.clone(),
+        name: event.name.clone(),
+        timestamp: chrono::Utc::now().timestamp_millis() as u64,
+        file_type: event.file_type.clone(),
+        size: Some(event.size),
+        thumbnail_url: Some(event.url.clone()),
+    });
+    let _ = app_handle.emit("upload_complete", &event);
 
     Ok(response)
 }
@@ -158,13 +176,28 @@ async fn upload_clipboard_image(
     )
     .await?;
 
-    let event = common::create_upload_event(response.clone(), Some(file_path));
+    let event = common::create_upload_event(response.clone(), Some(file_path.clone()));
     desktop::app::emit_event(&window, "upload_complete", &event);
+    // Also ensure OS notification + clipboard + disk history (works even when app hidden)
+    let app_handle = app.clone();
+    let _ = app_handle.clipboard().write_text(event.url.clone());
+    desktop::app::send_os_notification(&app_handle, "Upload Complete", "URL copied to clipboard");
+    let _ = common::add_to_history(common::UploadHistoryItem {
+        url: event.url.clone(),
+        name: event.name.clone(),
+        timestamp: chrono::Utc::now().timestamp_millis() as u64,
+        file_type: event.file_type.clone(),
+        size: Some(event.size),
+        thumbnail_url: Some(event.url.clone()),
+    });
+    let _ = app_handle.emit("upload_complete", &event);
+    let _ = app_handle.emit("region_upload_complete", &event);
 
     Ok(response)
 }
 
 /// Take screenshot, upload it, and return the URL
+/// Now handles clipboard + OS notification + history in Rust so it works even when frontend is hidden/backgrounded
 #[tauri::command]
 async fn screenshot_and_upload(
     window: tauri::Window,
@@ -175,35 +208,100 @@ async fn screenshot_and_upload(
     capture_all: Option<bool>,
     domain: Option<String>,
 ) -> Result<UploadCompleteEvent, String> {
-    // Emit that we're starting
-    desktop::app::emit_event(&window, "screenshot_started", serde_json::json!({}));
-    
-    // Capture screenshot based on mode
-    let screenshot_result = if capture_all.unwrap_or(false) {
-        screenshot::capture_all_monitors().await?
-    } else {
-        screenshot::capture_screenshot(monitor_index).await?
-    };
-    
-    desktop::app::emit_event(&window, "screenshot_captured", &screenshot_result);
-    
-    // Upload it
-    let upload_result = common::upload_file(
-        screenshot_result.path.clone(),
-        api_url,
-        upload_token,
-        visibility,
-        None,
-        domain,
-        None,
-    ).await?;
-    
-    let event = common::create_upload_event(upload_result, Some(screenshot_result.path));
-    
-    // Emit final event
-    desktop::app::emit_event(&window, "screenshot_uploaded", &event);
-    
-    Ok(event)
+    println!("[Flicker] screenshot_and_upload invoked: capture_all={:?} monitor={:?} token_len={} api_url={}", capture_all, monitor_index, upload_token.len(), api_url);
+    eprintln!("[Flicker] screenshot_and_upload: visibility={} domain={:?}", visibility, domain);
+    // Guard against concurrent captures
+    if SCREENSHOT_CAPTURING.swap(true, Ordering::SeqCst) {
+        return Err("Capture already in progress".to_string());
+    }
+
+    let result: Result<UploadCompleteEvent, String> = async {
+        // Check screen recording permission on macOS (same as region — prevents hang when denied)
+        #[cfg(target_os = "macos")]
+        {
+            if !desktop::macos::has_screen_recording_permission() {
+                let _ = desktop::macos::request_screen_recording_permission();
+                if !desktop::macos::has_screen_recording_permission() {
+                    desktop::macos::open_screen_recording_settings();
+                    return Err("Screen Recording permission required. Enable in System Settings → Privacy & Security → Screen Recording and restart Flicker.".to_string());
+                }
+            }
+        }
+
+        // Emit that we're starting
+        desktop::app::emit_event(&window, "screenshot_started", serde_json::json!({}));
+
+        // Hide main window so Flicker doesn't appear in its own screenshot (user reported always included)
+        let app_handle = window.app_handle().clone();
+        desktop::region::hide_main_for_capture(&app_handle);
+        tokio::time::sleep(std::time::Duration::from_millis(120)).await;
+
+        // Capture screenshot based on mode — wrap in timeout to avoid hanging “Capturing…” forever
+        let capture_res = tokio::time::timeout(
+            std::time::Duration::from_secs(8),
+            async {
+                if capture_all.unwrap_or(false) {
+                    screenshot::capture_all_monitors().await
+                } else {
+                    screenshot::capture_screenshot(monitor_index).await
+                }
+            },
+        )
+        .await;
+        // Restore immediately after capture attempt (before upload, so user sees app again quickly) — even on timeout/error
+        desktop::region::restore_main_after_capture(&app_handle);
+        let screenshot_result = capture_res
+            .map_err(|_| "Screenshot capture timed out after 8s — check Screen Recording permission".to_string())??;
+
+        desktop::app::emit_event(&window, "screenshot_captured", &screenshot_result);
+
+        // Upload it
+        let upload_result = common::upload_file(
+            screenshot_result.path.clone(),
+            api_url,
+            upload_token,
+            visibility,
+            None,
+            domain,
+            None,
+        )
+        .await?;
+
+        let event = common::create_upload_event(upload_result, Some(screenshot_result.path));
+
+        // Persist to disk history (so it survives app restarts and is visible when app returns)
+        let _ = common::add_to_history(common::UploadHistoryItem {
+            url: event.url.clone(),
+            name: event.name.clone(),
+            timestamp: chrono::Utc::now().timestamp_millis() as u64,
+            file_type: event.file_type.clone(),
+            size: Some(event.size),
+            thumbnail_url: Some(event.url.clone()),
+        });
+
+        // Copy URL to system clipboard (Rust side — works even when window hidden)
+        let app_handle = window.app_handle();
+        let _ = app_handle.clipboard().write_text(event.url.clone());
+
+        desktop::app::send_os_notification(&app_handle, "Upload Complete", "URL copied to clipboard");
+
+        // Emit final event for frontend (in-app notification, history refresh)
+        desktop::app::emit_event(&window, "screenshot_uploaded", &event);
+        // Also emit globally — frontend listens for upload_complete
+        let _ = window.app_handle().emit("upload_complete", &event);
+
+        Ok(event)
+    }
+    .await;
+
+    SCREENSHOT_CAPTURING.store(false, Ordering::SeqCst);
+
+    // On error, also try to notify via OS notification
+    if let Err(ref e) = result {
+        desktop::app::send_os_notification(window.app_handle(), "Screenshot Failed", e);
+    }
+
+    result
 }
 
 /// Gets system information
@@ -301,10 +399,21 @@ fn load_config() -> Result<serde_json::Value, String> {
 
 /// Save app configuration to disk
 #[tauri::command]
-fn save_config(config: serde_json::Value) -> Result<(), String> {
+fn save_config(app: tauri::AppHandle, config: serde_json::Value) -> Result<(), String> {
     let app_config: common::AppConfig = serde_json::from_value(config)
         .map_err(|e| format!("Failed to parse config: {}", e))?;
-    common::save_config(&app_config)
+    let result = common::save_config(&app_config);
+    if result.is_ok() {
+        // Re-register global hotkeys so new shortcuts take effect immediately — works even when app is backgrounded
+        let _ = desktop::hotkeys::reregister_hotkeys(&app);
+    }
+    result
+}
+
+/// Re-register global hotkeys from current config (call after save_config or on demand)
+#[tauri::command]
+fn reregister_hotkeys(app: tauri::AppHandle) -> Result<(), String> {
+    desktop::hotkeys::reregister_hotkeys(&app)
 }
 
 /// Load upload history from disk
@@ -589,6 +698,206 @@ fn notification_check_system() -> Vec<common::Notification> {
     common::check_system_notifications()
 }
 
+// ============================================================================
+// Region Capture (Global Overlay) Commands
+// ============================================================================
+
+/// Start global region capture overlay (system-wide, works when main window is hidden)
+#[tauri::command]
+async fn start_region_capture(app: tauri::AppHandle) -> Result<(), String> {
+    desktop::region::start_region_capture(app).await
+}
+
+/// Cancel / close the region overlay
+#[tauri::command]
+fn cancel_region_capture(app: tauri::AppHandle) -> Result<(), String> {
+    desktop::region::cancel_region_capture(&app)
+}
+
+/// Confirm region capture from overlay window - captures region and returns file path
+#[tauri::command]
+async fn confirm_region_capture(
+    app: tauri::AppHandle,
+    monitor_index: usize,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    scale_factor: Option<f64>,
+) -> Result<ScreenshotResult, String> {
+    desktop::region::confirm_region_capture(app, monitor_index, x, y, width, height, scale_factor).await
+}
+
+/// Capture region and upload in one call (used by overlay for full flow)
+#[tauri::command]
+async fn capture_region_and_upload(
+    app: tauri::AppHandle,
+    monitor_index: usize,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    scale_factor: Option<f64>,
+    api_url: Option<String>,
+    upload_token: Option<String>,
+    visibility: Option<String>,
+    domain: Option<String>,
+) -> Result<UploadCompleteEvent, String> {
+    desktop::region::capture_region_and_upload(
+        app,
+        monitor_index,
+        x,
+        y,
+        width,
+        height,
+        scale_factor,
+        api_url,
+        upload_token,
+        visibility,
+        domain,
+    )
+    .await
+}
+
+/// Check screen recording permission (macOS)
+#[tauri::command]
+fn check_screen_recording_permission() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        desktop::macos::has_screen_recording_permission()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        true
+    }
+}
+
+/// Request screen recording permission (macOS) and open settings if needed
+#[tauri::command]
+fn request_screen_recording_permission() -> Result<bool, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let has = desktop::macos::has_screen_recording_permission();
+        if has {
+            return Ok(true);
+        }
+        let _ = desktop::macos::request_screen_recording_permission();
+        // Give system a moment then check again
+        let has_now = desktop::macos::has_screen_recording_permission();
+        if !has_now {
+            desktop::macos::open_screen_recording_settings();
+            return Ok(false);
+        }
+        Ok(true)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Ok(true)
+    }
+}
+
+/// Capture window under cursor (single-click without drag) and upload — fixes Helium tabs not captured
+#[tauri::command]
+async fn capture_window_and_upload(
+    app: tauri::AppHandle,
+    x: f64,
+    y: f64,
+    monitor_index: usize,
+    scale_factor: Option<f64>,
+    api_url: Option<String>,
+    upload_token: Option<String>,
+    visibility: Option<String>,
+    domain: Option<String>,
+) -> Result<UploadCompleteEvent, String> {
+    desktop::region::capture_window_and_upload(
+        app, x, y, monitor_index, scale_factor, api_url, upload_token, visibility, domain,
+    )
+    .await
+}
+
+/// Check accessibility permission (macOS — needed for global shortcuts in background)
+#[tauri::command]
+fn check_accessibility_permission() -> bool {
+    desktop::macos::has_accessibility_permission()
+}
+
+/// Request accessibility permission (opens System Settings)
+#[tauri::command]
+fn request_accessibility_permission() -> Result<bool, String> {
+    if desktop::macos::has_accessibility_permission() {
+        return Ok(true);
+    }
+    desktop::macos::open_accessibility_settings();
+    // On macOS, AXIsProcessTrusted will be true only after user grants and restarts
+    Ok(desktop::macos::has_accessibility_permission())
+}
+
+/// Check if app is allowed to run in background (Login Item)
+#[tauri::command]
+fn check_background_permission(app: tauri::AppHandle) -> bool {
+    desktop::macos::is_background_enabled(&app)
+}
+
+/// Enable background execution (adds to Login Items)
+#[tauri::command]
+fn enable_background(app: tauri::AppHandle) -> Result<bool, String> {
+    desktop::macos::enable_background(&app)
+}
+
+/// Open background items settings
+#[tauri::command]
+fn open_background_settings() {
+    desktop::macos::open_background_settings();
+}
+
+/// Open Screen Recording settings (macOS)
+#[tauri::command]
+fn open_screen_recording_settings() {
+    desktop::macos::open_screen_recording_settings();
+}
+
+/// Open Accessibility settings (macOS)
+#[tauri::command]
+fn open_accessibility_settings() {
+    desktop::macos::open_accessibility_settings();
+}
+
+/// Start native video recording (mp4, 10m max, no ffmpeg)
+#[tauri::command]
+async fn start_video_recording(
+    app: tauri::AppHandle,
+    options: Option<desktop::video::VideoRecordOptions>,
+) -> Result<desktop::video::VideoRecordingStatus, String> {
+    desktop::video::start_video_recording(&app, options).await
+}
+
+/// Stop video recording and optionally upload
+#[tauri::command]
+async fn stop_video_recording(
+    app: tauri::AppHandle,
+    auto_upload: Option<bool>,
+) -> Result<Option<UploadCompleteEvent>, String> {
+    desktop::video::stop_video_recording(&app, auto_upload).await
+}
+
+/// Cancel video recording
+#[tauri::command]
+async fn cancel_video_recording(app: tauri::AppHandle) -> Result<(), String> {
+    desktop::video::cancel_video_recording(&app).await
+}
+
+/// Get video recording status
+#[tauri::command]
+fn get_recording_status() -> desktop::video::VideoRecordingStatus {
+    desktop::video::get_recording_status()
+}
+
+/// Toggle video recording
+#[tauri::command]
+async fn toggle_video_recording(app: tauri::AppHandle) -> Result<(), String> {
+    desktop::video::toggle_video_recording(app).await
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default();
@@ -610,8 +919,19 @@ pub fn run() {
             // Setup system tray and window handlers (non-blocking)
             #[cfg(not(mobile))]
             {
+                // Run as menu-bar (accessory) app on macOS so Flicker lives in the
+                // menu bar / tray, not the Dock. LSUIElement in Info.plist covers
+                // the bundled app; this covers `tauri dev` too.
+                #[cfg(target_os = "macos")]
+                {
+                    let _ = tauri_app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+                }
                 desktop::app::setup_system_tray(tauri_app)?;
                 desktop::app::setup_window_handlers(tauri_app)?;
+                // Register global hotkeys in Rust so captures work even when main window is hidden/backgrounded
+                // (fixes: “need to go back into app to upload”)
+                let app_handle = tauri_app.handle().clone();
+                let _ = desktop::hotkeys::reregister_hotkeys(&app_handle);
             }
             
             Ok(())
@@ -660,6 +980,26 @@ pub fn run() {
             notification_delete,
             notification_clear_all,
             notification_check_system,
+            start_region_capture,
+            cancel_region_capture,
+            confirm_region_capture,
+            capture_region_and_upload,
+            capture_window_and_upload,
+            check_screen_recording_permission,
+            request_screen_recording_permission,
+            check_accessibility_permission,
+            request_accessibility_permission,
+            check_background_permission,
+            enable_background,
+            open_background_settings,
+            open_screen_recording_settings,
+            open_accessibility_settings,
+            start_video_recording,
+            stop_video_recording,
+            cancel_video_recording,
+            get_recording_status,
+            toggle_video_recording,
+            reregister_hotkeys,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

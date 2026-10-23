@@ -18,6 +18,10 @@ export function PageRouter() {
         updateConfig,
         handleLogout,
         setShowLogin,
+        takeRegionScreenshot,
+        isVideoRecording,
+        videoElapsed,
+        toggleVideoRecording,
     } = useApp()
 
     if (!config) return null
@@ -33,9 +37,14 @@ export function PageRouter() {
                         password={config.password}
                         domain={config.preferredDomain}
                         behavior={config.behavior}
+                        onCaptureRegion={takeRegionScreenshot}
+                        isVideoRecording={isVideoRecording}
+                        videoElapsed={videoElapsed}
+                        onToggleVideo={toggleVideoRecording}
                     />
                 </PageLayout>
             )
+
 
         case 'history':
             return (
