@@ -13,32 +13,30 @@ export function MainLayout({ children }: MainLayoutProps) {
     const { config, history, activePage, setActivePage, handleLogout, isLoggedIn, setShowLogin } = useApp()
 
     const navItems: NavItem[] = [
-        { id: 'upload', label: 'Upload', icon: <Upload size={20} /> },
-        { id: 'history', label: 'History', icon: <History size={20} />, badge: history.length > 0 ? history.length : undefined },
-        { id: 'shorten', label: 'Shorten', icon: <Link2 size={20} /> },
-        { id: 'analytics', label: 'Stats', icon: <BarChart3 size={20} /> },
+        { id: 'upload', label: 'Upload', icon: <Upload size={16} /> },
+        { id: 'history', label: 'History', icon: <History size={16} />, badge: history.length > 0 ? history.length : undefined },
+        { id: 'shorten', label: 'Shorten', icon: <Link2 size={16} /> },
+        { id: 'analytics', label: 'Stats', icon: <BarChart3 size={16} /> },
     ]
 
     return (
         <div className="flex flex-col flex-1 overflow-hidden lg:flex-row">
-            {/* Desktop Sidebar */}
             <div className="hidden lg:block">
                 <Sidebar
                     activeNav={activePage}
                     onNavChange={(id) => setActivePage(id as any)}
                     navItems={navItems}
-                    username={config?.user?.name || config?.user?.email}
+                    username={config?.user?.name || config?.user?.email || undefined}
                     onLogout={handleLogout}
                     showLogout={isLoggedIn}
                 />
             </div>
 
-            {/* Mobile Sidebar */}
             <MobileSidebar
                 activeNav={activePage}
                 onNavChange={(id) => setActivePage(id as any)}
                 navItems={navItems}
-                username={config?.user?.name || config?.user?.email}
+                username={config?.user?.name || config?.user?.email || undefined}
                 onLogout={handleLogout}
                 showLogout={isLoggedIn}
                 isLoggedIn={isLoggedIn}
@@ -46,7 +44,6 @@ export function MainLayout({ children }: MainLayoutProps) {
                 uploadCount={history.length}
             />
 
-            {/* Main Content Area */}
             <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
                 <Header />
                 <main className="flex-1 p-3 overflow-auto lg:p-6">

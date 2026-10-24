@@ -12,11 +12,11 @@ const FONT_FAMILIES = {
 }
 
 const DEFAULT_APPEARANCE: AppearanceConfig = {
-  theme: 'hawkins-neon',
+  theme: 'ember',
   backgroundOpacity: 1,
   fontScale: 'medium',
-  fontFamily: 'system',
-  borderRadius: 'medium',
+  fontFamily: 'inter',
+  borderRadius: 'large',
   sidebarPosition: 'left',
   compactMode: false,
   animations: true,
@@ -60,10 +60,6 @@ export function saveAppearance(config: Partial<AppearanceConfig>) {
   return updated
 }
 
-/**
- * Simple function to Apply Appearance Changes.
- * 
- */
 export function applyAppearance(config: AppearanceConfig) {
   const root = document.documentElement
   const fontKey = config.fontFamily || 'system'
@@ -74,7 +70,7 @@ export function applyAppearance(config: AppearanceConfig) {
   root.style.setProperty('--font-family', FONT_FAMILIES[fontKey as keyof typeof FONT_FAMILIES] || FONT_FAMILIES.system)
   root.setAttribute('data-font-size', config.fontScale || 'medium')
   root.setAttribute('data-radius', radiusKey)
-  root.style.setProperty('--radius', radiusMap[radiusKey as keyof typeof radiusMap] || '0.5rem')
+  root.style.setProperty('--radius', radiusMap[radiusKey as keyof typeof radiusMap] || '0.75rem')
   root.setAttribute('data-animations', String(config.animations ?? true))
   root.setAttribute('data-glass', String(config.glassEffect ?? true))
   root.setAttribute('data-compact', String(config.compactMode ?? false))

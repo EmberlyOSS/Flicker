@@ -1,6 +1,5 @@
 import { ClipboardFormat } from '../types'
 
-/** Formats an upload URL for the clipboard according to the user's preferred format. */
 export function formatForClipboard(url: string, name: string, format: ClipboardFormat = 'url'): string {
   switch (format) {
     case 'raw-url':

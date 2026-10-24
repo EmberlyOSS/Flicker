@@ -1,232 +1,144 @@
 import { useState, useEffect } from 'react'
-import {
-    FileText, Trash2, Copy, Check, RefreshCw,
-    AlertCircle, AlertTriangle, Info, ChevronDown, ChevronUp,
-    Search, X, AlertOctagon
-} from 'lucide-react'
+import { Trash2, Copy, Check, RefreshCw, AlertCircle, AlertTriangle, Info, Search, X } from 'lucide-react'
 import { useAudit, AuditLogEntry } from '../../hooks/useAudit'
+import { Segmented } from '../ui/kit'
 
 interface AuditLogPanelProps {
     initialLimit?: number
     compact?: boolean
 }
 
+type Level = 'all' | 'info' | 'warning' | 'error'
+
 export function AuditLogPanel({ initialLimit = 50, compact = false }: AuditLogPanelProps) {
     const { logs, loading, loadAuditLogs, clearAuditLogs, exportAuditLogs, isTauriAvailable } = useAudit()
     const [expandedId, setExpandedId] = useState<string | null>(null)
     const [copied, setCopied] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
-    const [levelFilter, setLevelFilter] = useState<'all' | 'info' | 'warning' | 'error'>('all')
+    const [levelFilter, setLevelFilter] = useState<Level>('all')
 
     useEffect(() => {
-        if (isTauriAvailable) {
-            loadAuditLogs(initialLimit)
-        }
+        if (isTauriAvailable) loadAuditLogs(initialLimit)
     }, [loadAuditLogs, initialLimit, isTauriAvailable])
 
-    // Show message if not in Tauri
     if (!isTauriAvailable) {
-        return (
-            <div className="py-8 text-center">
-                <AlertOctagon size={24} className="mx-auto mb-2 text-muted-foreground/50" />
-                <p className="text-sm text-muted-foreground">Audit logs are only available in the desktop app</p>
-                <p className="mt-1 text-xs text-muted-foreground/60">Run the Tauri application to view logs</p>
-            </div>
-        )
+        return <p className="py-6 text-center text-xs text-muted-foreground">The activity log is only available in the desktop app.</p>
     }
 
-    const filteredLogs = logs.filter(log => {
-        const matchesSearch = searchQuery === '' ||
-            log.message.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            log.event_type.toLowerCase().includes(searchQuery.toLowerCase())
-        const matchesLevel = levelFilter === 'all' || log.level === levelFilter
-        return matchesSearch && matchesLevel
-    })
+    const query = searchQuery.toLowerCase()
+    const filteredLogs = logs.filter(log =>
+        (query === '' || log.message.toLowerCase().includes(query) || log.event_type.toLowerCase().includes(query)) &&
+        (levelFilter === 'all' || log.level === levelFilter)
+    )
 
     const handleExport = async () => {
         const exported = await exportAuditLogs()
-        if (exported) {
-            navigator.clipboard.writeText(exported)
-            setCopied(true)
-            setTimeout(() => setCopied(false), 2000)
-        }
+        if (!exported) return
+        navigator.clipboard.writeText(exported)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
     }
 
     const handleClear = async () => {
-        if (confirm('Are you sure you want to clear all audit logs?')) {
-            await clearAuditLogs()
-        }
+        if (confirm('Clear the activity log?')) await clearAuditLogs()
     }
 
-    const levelCounts = {
-        all: logs.length,
-        info: logs.filter(l => l.level === 'info').length,
-        warning: logs.filter(l => l.level === 'warning').length,
-        error: logs.filter(l => l.level === 'error').length,
-    }
+    const count = (level: Level) => (level === 'all' ? logs.length : logs.filter(l => l.level === level).length)
+    const iconButton = 'rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground'
 
     return (
-        <div className="space-y-3">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <FileText size={16} className="text-primary" />
-                    <span className="text-sm font-medium text-foreground">Activity Logs</span>
-                    <span className="px-1.5 py-0.5 text-[10px] font-bold bg-primary/20 text-primary rounded">
-                        {filteredLogs.length}
-                    </span>
-                </div>
-                <div className="flex items-center gap-1">
-                    <button
-                        onClick={() => loadAuditLogs(initialLimit)}
-                        disabled={loading}
-                        className="p-1.5 hover:bg-secondary rounded transition-colors"
-                        title="Refresh"
-                    >
-                        <RefreshCw size={14} className={`text-muted-foreground ${loading ? 'animate-spin' : ''}`} />
+        <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                {!compact ? (
+                    <div className="flex flex-1 flex-wrap items-center gap-2">
+                        <div className="relative min-w-40 flex-1">
+                            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                            <input
+                                type="text"
+                                placeholder="Search"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full rounded-lg border border-input bg-background py-1.5 pl-8 pr-7 text-xs text-foreground placeholder-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
+                            />
+                            {searchQuery && (
+                                <button onClick={() => setSearchQuery('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground">
+                                    <X size={12} />
+                                </button>
+                            )}
+                        </div>
+                        <Segmented
+                            value={levelFilter}
+                            onChange={setLevelFilter}
+                            options={(['all', 'info', 'warning', 'error'] as const).map(level => ({
+                                value: level,
+                                label: `${level === 'warning' ? 'Warnings' : level === 'error' ? 'Errors' : level.charAt(0).toUpperCase() + level.slice(1)} ${count(level)}`,
+                            }))}
+                        />
+                    </div>
+                ) : (
+                    <span className="text-xs text-muted-foreground">{logs.length} entries</span>
+                )}
+                <div className="flex gap-1">
+                    <button onClick={() => loadAuditLogs(initialLimit)} disabled={loading} title="Refresh" className={iconButton}>
+                        <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
                     </button>
-                    <button
-                        onClick={handleExport}
-                        className="p-1.5 hover:bg-secondary rounded transition-colors"
-                        title="Copy logs to clipboard"
-                    >
-                        {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} className="text-muted-foreground" />}
+                    <button onClick={handleExport} title="Copy as JSON" className={iconButton}>
+                        {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
                     </button>
-                    <button
-                        onClick={handleClear}
-                        className="p-1.5 hover:bg-secondary rounded transition-colors"
-                        title="Clear logs"
-                    >
-                        <Trash2 size={14} className="text-muted-foreground hover:text-destructive" />
+                    <button onClick={handleClear} title="Clear" className={iconButton}>
+                        <Trash2 size={14} />
                     </button>
                 </div>
             </div>
 
-            {/* Search and Filters */}
-            {!compact && (
-                <div className="space-y-2">
-                    <div className="relative">
-                        <Search size={14} className="absolute -translate-y-1/2 left-3 top-1/2 text-muted-foreground" />
-                        <input
-                            type="text"
-                            placeholder="Search logs..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full py-2 pr-8 text-xs border rounded-lg pl-9 bg-secondary/30 border-border/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                        />
-                        {searchQuery && (
-                            <button
-                                onClick={() => setSearchQuery('')}
-                                className="absolute p-1 -translate-y-1/2 rounded right-2 top-1/2 hover:bg-secondary"
-                            >
-                                <X size={12} className="text-muted-foreground" />
-                            </button>
-                        )}
-                    </div>
-
-                    {/* Level Filter Pills */}
-                    <div className="flex gap-1">
-                        {(['all', 'info', 'warning', 'error'] as const).map(level => (
-                            <button
-                                key={level}
-                                onClick={() => setLevelFilter(level)}
-                                className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${levelFilter === level
-                                    ? level === 'all' ? 'bg-primary text-primary-foreground' :
-                                        level === 'error' ? 'bg-red-500/20 text-red-400' :
-                                            level === 'warning' ? 'bg-yellow-500/20 text-yellow-400' :
-                                                'bg-blue-500/20 text-blue-400'
-                                    : 'bg-secondary/30 text-muted-foreground hover:bg-secondary/50'
-                                    }`}
-                            >
-                                {level.charAt(0).toUpperCase() + level.slice(1)} ({levelCounts[level]})
-                            </button>
+            <div className={`overflow-y-auto rounded-lg border border-border/60 ${compact ? 'max-h-48' : 'max-h-80'}`}>
+                {filteredLogs.length > 0 ? (
+                    <div className="divide-y divide-border/60">
+                        {filteredLogs.map(log => (
+                            <LogEntry
+                                key={log.id}
+                                log={log}
+                                expanded={expandedId === log.id}
+                                onToggle={() => setExpandedId(expandedId === log.id ? null : log.id)}
+                            />
                         ))}
                     </div>
-                </div>
-            )}
-
-            {/* Log List */}
-            <div className={`space-y-2 overflow-y-auto ${compact ? 'max-h-48' : 'max-h-96'}`}>
-                {filteredLogs.length > 0 ? (
-                    filteredLogs.map((log) => (
-                        <LogEntry
-                            key={log.id}
-                            log={log}
-                            expanded={expandedId === log.id}
-                            onToggle={() => setExpandedId(expandedId === log.id ? null : log.id)}
-                        />
-                    ))
                 ) : (
-                    <div className="py-8 text-center">
-                        <FileText size={24} className="mx-auto mb-2 text-muted-foreground/30" />
-                        <p className="text-xs text-muted-foreground">
-                            {searchQuery || levelFilter !== 'all' ? 'No matching logs' : 'No activity logged yet'}
-                        </p>
-                    </div>
+                    <p className="py-8 text-center text-xs text-muted-foreground">
+                        {searchQuery || levelFilter !== 'all' ? 'Nothing matches' : 'Nothing logged yet'}
+                    </p>
                 )}
             </div>
         </div>
     )
 }
 
-// Helper functions
-function getLevelIcon(level: string) {
-    switch (level) {
-        case 'error':
-            return <AlertCircle size={14} className="text-red-400" />
-        case 'warning':
-            return <AlertTriangle size={14} className="text-yellow-400" />
-        default:
-            return <Info size={14} className="text-blue-400" />
-    }
+function LevelIcon({ level }: { level: AuditLogEntry['level'] }) {
+    if (level === 'error') return <AlertCircle size={14} className="text-red-400" />
+    if (level === 'warning') return <AlertTriangle size={14} className="text-amber-400" />
+    return <Info size={14} className="text-muted-foreground" />
 }
 
-function getLevelStyle(level: string) {
-    switch (level) {
-        case 'error':
-            return 'bg-red-500/20 text-red-400 border-red-500/30'
-        case 'warning':
-            return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
-        default:
-            return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
-    }
-}
-
-function formatTimestamp(timestamp: string): string {
-    try {
-        const date = new Date(timestamp)
-        return date.toLocaleString()
-    } catch {
-        return timestamp
-    }
+function formatTimestamp(timestamp: string) {
+    const date = new Date(timestamp)
+    return isNaN(date.getTime()) ? timestamp : date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
 function LogEntry({ log, expanded, onToggle }: { log: AuditLogEntry; expanded: boolean; onToggle: () => void }) {
+    const hasMetadata = !!log.metadata && Object.keys(log.metadata).length > 0
     return (
-        <div className={`border rounded-lg transition-all ${getLevelStyle(log.level).split(' ')[2]} bg-secondary/20`}>
-            <button onClick={onToggle} className="flex items-start w-full gap-3 p-3 text-left">
-                <div className="flex-shrink-0 mt-0.5">{getLevelIcon(log.level)}</div>
-                <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${getLevelStyle(log.level)}`}>
-                            {log.level}
-                        </span>
-                        <span className="text-xs font-medium text-foreground">{log.event_type}</span>
-                        <span className="text-[10px] text-muted-foreground">{formatTimestamp(log.timestamp)}</span>
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{log.message}</p>
-                </div>
-                <div className="flex-shrink-0">
-                    {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                </div>
+        <div>
+            <button onClick={hasMetadata ? onToggle : undefined} className={`flex w-full items-start gap-3 px-3 py-2 text-left ${hasMetadata ? 'hover:bg-secondary/40' : 'cursor-default'}`}>
+                <span className="mt-0.5 shrink-0"><LevelIcon level={log.level} /></span>
+                <span className="min-w-0 flex-1">
+                    <span className="block text-xs text-foreground">{log.message}</span>
+                    <span className="block text-[11px] text-muted-foreground">{log.event_type} · {formatTimestamp(log.timestamp)}</span>
+                </span>
             </button>
-
-            {expanded && log.metadata && (
-                <div className="px-3 pt-0 pb-3">
-                    <div className="p-2 rounded bg-black/30 font-mono text-[10px] text-muted-foreground overflow-x-auto">
-                        <pre>{JSON.stringify(log.metadata, null, 2)}</pre>
-                    </div>
-                </div>
+            {expanded && hasMetadata && (
+                <pre className="mx-3 mb-2 overflow-x-auto rounded bg-black/30 p-2 font-mono text-[10px] text-muted-foreground">
+                    {JSON.stringify(log.metadata, null, 2)}
+                </pre>
             )}
         </div>
     )

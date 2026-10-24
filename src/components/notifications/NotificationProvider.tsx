@@ -38,7 +38,6 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [toasts, setToasts] = useState<Toast[]>([])
 
-  // All methods should be non-blocking callbacks
   const addNotification = useCallback((notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
     const newNotification: Notification = {
       ...notification,
@@ -55,7 +54,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const markAsRead = useCallback((id: string) => {
-    setNotifications(prev => 
+    setNotifications(prev =>
       prev.map(n => n.id === id ? { ...n, read: true } : n)
     )
   }, [])
@@ -63,12 +62,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const addToast = useCallback((message: string, type: Toast['type'] = 'info', duration = 5000) => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2)}`
     setToasts(prev => [...prev, { id, message, type, duration }])
-    
-    // Auto-remove toast after duration
+
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id))
     }, duration)
-    
+
     return id
   }, [])
 
@@ -84,8 +82,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     warning: (msg: string) => addToast(msg, 'warning'),
   }
 
-  // Don't do any async work or invoke calls in the provider itself
-  // Keep it purely synchronous
+  // Keep this provider synchronous; no async work or invoke calls here.
 
   return (
     <NotificationContext.Provider value={{

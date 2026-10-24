@@ -1,6 +1,3 @@
-/// Mobile platform abstraction - shared capabilities for Android, iOS
-
-/// Mobile-specific platform capabilities
 pub struct MobileCapabilities {
     pub native_screenshot: bool,
     pub region_capture: bool,
@@ -10,7 +7,6 @@ pub struct MobileCapabilities {
     pub file_access: String,
 }
 
-/// Get mobile platform capabilities
 pub fn get_mobile_capabilities() -> MobileCapabilities {
     MobileCapabilities {
         native_screenshot: false,

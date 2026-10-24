@@ -34,7 +34,6 @@ export function RegionSelector({ onSelect, onCancel }: RegionSelectorProps) {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
   const dragRef = useRef<DragState | null>(null)
 
-  // Keep dragRef in sync so draw loop always has latest state
   useEffect(() => {
     dragRef.current = drag
   }, [drag])
@@ -47,25 +46,21 @@ export function RegionSelector({ onSelect, onCancel }: RegionSelectorProps) {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-    // Dark overlay
     ctx.fillStyle = 'rgba(0, 0, 0, 0.45)'
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
     if (d?.dragging) {
       const rect = getRect(d)
 
-      // Cut out the selected region (make it visible)
       ctx.clearRect(rect.x, rect.y, rect.width, rect.height)
 
-      // Border around selection
-      ctx.strokeStyle = 'rgba(99, 102, 241, 1)'
+      ctx.strokeStyle = 'rgba(249, 115, 22, 1)'
       ctx.lineWidth = 2
       ctx.setLineDash([])
       ctx.strokeRect(rect.x, rect.y, rect.width, rect.height)
 
-      // Corner handles
       const handleSize = 7
-      ctx.fillStyle = 'rgba(99, 102, 241, 1)'
+      ctx.fillStyle = 'rgba(249, 115, 22, 1)'
       const corners: [number, number][] = [
         [rect.x, rect.y],
         [rect.x + rect.width, rect.y],
@@ -76,7 +71,6 @@ export function RegionSelector({ onSelect, onCancel }: RegionSelectorProps) {
         ctx.fillRect(cx - handleSize / 2, cy - handleSize / 2, handleSize, handleSize)
       }
 
-      // Dimension label
       if (rect.width > 40 && rect.height > 20) {
         const label = `${Math.round(rect.width)} × ${Math.round(rect.height)}`
         ctx.font = 'bold 12px ui-monospace, monospace'
@@ -85,7 +79,7 @@ export function RegionSelector({ onSelect, onCancel }: RegionSelectorProps) {
         const labelYBelow = rect.y + rect.height + 6
         const finalY = labelYBelow + 22 > canvas.height ? rect.y - 28 : labelYBelow
 
-        ctx.fillStyle = 'rgba(79, 70, 229, 0.92)'
+        ctx.fillStyle = 'rgba(194, 65, 12, 0.95)'
         ctx.beginPath()
         ctx.roundRect(labelX, finalY, textW, 20, 4)
         ctx.fill()
@@ -95,7 +89,6 @@ export function RegionSelector({ onSelect, onCancel }: RegionSelectorProps) {
       }
     }
 
-    // Crosshair
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)'
     ctx.lineWidth = 1
     ctx.setLineDash([5, 5])
@@ -109,7 +102,6 @@ export function RegionSelector({ onSelect, onCancel }: RegionSelectorProps) {
     ctx.stroke()
     ctx.setLineDash([])
 
-    // Coordinate tooltip near cursor
     const coordLabel = `${Math.round(mx)}, ${Math.round(my)}`
     ctx.font = '11px ui-monospace, monospace'
     const cw = ctx.measureText(coordLabel).width + 12
@@ -122,7 +114,7 @@ export function RegionSelector({ onSelect, onCancel }: RegionSelectorProps) {
     ctx.beginPath()
     ctx.roundRect(tipX, tipY, cw, 18, 3)
     ctx.fill()
-    ctx.fillStyle = 'rgba(200, 210, 255, 1)'
+    ctx.fillStyle = 'rgba(254, 215, 170, 1)'
     ctx.fillText(coordLabel, tipX + 6, tipY + 13)
   }, [])
 
@@ -141,7 +133,6 @@ export function RegionSelector({ onSelect, onCancel }: RegionSelectorProps) {
     return () => window.removeEventListener('resize', handleResize)
   }, [draw, mousePos])
 
-  // Redraw on state changes
   useEffect(() => {
     draw(drag, mousePos.x, mousePos.y)
   }, [drag, mousePos, draw])
@@ -170,7 +161,7 @@ export function RegionSelector({ onSelect, onCancel }: RegionSelectorProps) {
       if (!drag?.dragging) return
       e.preventDefault()
       const rect = getRect(drag)
-      // Ignore tiny accidental clicks
+
       if (rect.width < 5 || rect.height < 5) {
         setDrag(null)
         return
@@ -210,7 +201,6 @@ export function RegionSelector({ onSelect, onCancel }: RegionSelectorProps) {
         onMouseUp={handleMouseUp}
       />
 
-      {/* Instruction banner — only shown before dragging */}
       {!drag?.dragging && (
         <div
           style={{
@@ -250,7 +240,6 @@ export function RegionSelector({ onSelect, onCancel }: RegionSelectorProps) {
         </div>
       )}
 
-      {/* Cancel button */}
       <button
         onClick={onCancel}
         style={{

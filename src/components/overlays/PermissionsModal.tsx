@@ -38,7 +38,7 @@ export function PermissionsModal() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
       <div className="w-full max-w-lg overflow-hidden border shadow-2xl glass-card border-border/50 rounded-2xl animate-scale-up">
-        {/* Header */}
+
         <div className="flex items-center justify-between p-6 border-b border-border/30 bg-secondary/20">
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-10 h-10 border rounded-xl bg-primary/20 border-primary/30 text-primary">
@@ -57,9 +57,8 @@ export function PermissionsModal() {
           </button>
         </div>
 
-        {/* Permission Cards */}
         <div className="p-6 space-y-4 max-h-[65vh] overflow-y-auto">
-          {/* Screen Recording */}
+
           <div className="p-4 transition-colors border rounded-xl bg-secondary/30 border-border/40 hover:bg-secondary/40">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-start gap-3">
@@ -107,7 +106,6 @@ export function PermissionsModal() {
             </div>
           </div>
 
-          {/* Accessibility */}
           <div className="p-4 transition-colors border rounded-xl bg-secondary/30 border-border/40 hover:bg-secondary/40">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-start gap-3">
@@ -155,7 +153,6 @@ export function PermissionsModal() {
             </div>
           </div>
 
-          {/* Run in Background */}
           <div className="p-4 transition-colors border rounded-xl bg-secondary/30 border-border/40 hover:bg-secondary/40">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-start gap-3">
@@ -198,7 +195,6 @@ export function PermissionsModal() {
           </div>
         </div>
 
-        {/* Footer */}
         <div className="flex items-center justify-between p-4 border-t border-border/30 bg-secondary/10">
           <button
             onClick={() => checkMacPermissions()}

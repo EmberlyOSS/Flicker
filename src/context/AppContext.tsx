@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { logActivity } from '../utils/consoleBuffer'
+import { playSound } from '../utils/sounds'
 import { AppConfig, UploadResponse, LoginResponse, UploadHistoryItem, UploadCompleteEvent } from '../types'
 import { loadConfig, saveConfig, loadUploadHistory, saveUploadHistory, addToUploadHistory } from '../config'
 import { useHotkeys } from '../hooks/useHotkeys'
@@ -14,58 +16,68 @@ interface MacPermissions {
     background: boolean
 }
 
+export interface InstanceInfo {
+    name: string
+    version: string
+    cloud: boolean
+    billingEnabled: boolean
+    features: { customDomains: boolean; squads: boolean; discovery: boolean; deviceSignIn: boolean }
+}
+
+const DEFAULT_INSTANCE: InstanceInfo = {
+    name: 'Emberly',
+    version: '',
+    cloud: true,
+    billingEnabled: true,
+    features: { customDomains: true, squads: true, discovery: true, deviceSignIn: true },
+}
+
 interface AppContextValue {
-    // Config
+    instance: InstanceInfo
+
     config: AppConfig | null
     updateConfig: (config: AppConfig) => void
 
-    // Auth
     isLoggedIn: boolean
     showLogin: boolean
     setShowLogin: (show: boolean) => void
     handleLogin: (uploadToken: string, user: LoginResponse['user']) => void
     handleLogout: () => void
 
-    // History
     history: UploadHistoryItem[]
     handleUploadComplete: (filePath: string, response: UploadResponse) => void
     handleDeleteFromHistory: (url: string) => void
     handleCopyUrl: (url: string) => void
 
-    // Navigation
     activePage: PageId
     setActivePage: (page: PageId) => void
 
-    // Screenshots
     screenshotStatus: string | null
     takeFullscreenScreenshot: () => void
     takeAllMonitorsScreenshot: () => void
-    /** Triggers the region selector overlay */
+    uploadClipboardImage: () => Promise<void>
+
     takeRegionScreenshot: () => void
-    /** Called by RegionSelector with the selected region coords */
+
     captureAndUploadRegion: (x: number, y: number, width: number, height: number) => Promise<void>
-    /** Whether the region selector overlay is currently visible */
+
     showRegionSelector: boolean
     setShowRegionSelector: (show: boolean) => void
 
-    // Video
     isVideoRecording: boolean
     videoElapsed: number
     toggleVideoRecording: () => Promise<void>
     startVideoRecording: (region?: { x: number; y: number; width: number; height: number } | null) => Promise<void>
     stopVideoRecording: () => Promise<void>
 
-    // macOS Permissions (soft-blocking startup screen)
     macPermissions: MacPermissions
     showPermissionsModal: boolean
     setShowPermissionsModal: (show: boolean) => void
     checkMacPermissions: () => Promise<void>
     requestMacPermissions: (type: 'screen' | 'accessibility' | 'background') => Promise<void>
 
-    // Notifications
     notifications: ReturnType<typeof useNotifications>
 }
-
 
 const AppContext = createContext<AppContextValue | null>(null)
 
@@ -77,17 +89,21 @@ export function useApp() {
     return context
 }
 
+interface AccountFile {
+    id: string
+    name: string
+    urlPath: string
+    mimeType: string
+    size: number
+    visibility: string
+    hasPassword: boolean
+    uploadedAt: string
+}
+
 interface AppProviderProps {
     children: ReactNode
 }
 
-/**
- * AppProvider component that wraps the application and provides global state and context.
- * It manages configuration, authentication, upload history, navigation, screenshot functionality, and notifications.
- * 
- * @param {AppProviderProps} props - The properties for the AppProvider component.
- * @returns {JSX.Element} The AppProvider component that wraps its children with the AppContext.
- */
 export function AppProvider({ children }: AppProviderProps) {
     const [config, setConfig] = useState<AppConfig | null>(null)
     const [history, setHistory] = useState<UploadHistoryItem[]>([])
@@ -101,6 +117,7 @@ export function AppProvider({ children }: AppProviderProps) {
     const [showPermissionsModal, setShowPermissionsModal] = useState(false)
 
     const notifications = useNotifications()
+    const [instance, setInstance] = useState<InstanceInfo>(DEFAULT_INSTANCE)
 
     useEffect(() => {
         try {
@@ -111,7 +128,7 @@ export function AppProvider({ children }: AppProviderProps) {
             if (!loadedConfig.uploadToken) {
                 setShowLogin(true)
             }
-            // Also try to sync config to Rust backend for global overlay use
+
             if ((window as any).__TAURI_INTERNALS__) {
                 invoke('save_config', { config: loadedConfig as any }).catch(() => {})
             }
@@ -160,17 +177,16 @@ export function AppProvider({ children }: AppProviderProps) {
                 setMacPermissions(prev => ({ ...prev, background: ok }))
                 if (!ok) await invoke('open_background_settings').catch(() => {})
             }
-            // Re-check all after
+
             await checkMacPermissions()
         } catch {}
     }, [checkMacPermissions])
 
-    // On mount, check permissions and show soft-blocking modal if any missing and not dismissed this session
     useEffect(() => {
         if (!(window as any).__TAURI_INTERNALS__) return
         const timer = setTimeout(async () => {
             await checkMacPermissions()
-            // Read latest state via invokes
+
             try {
                 const isMac = /Mac|iPhone|iPad/.test(navigator.platform || '')
                 if (!isMac) return
@@ -188,7 +204,6 @@ export function AppProvider({ children }: AppProviderProps) {
         return () => clearTimeout(timer)
     }, [checkMacPermissions])
 
-    // Video recording status polling and events
     useEffect(() => {
         if (!(window as any).__TAURI_INTERNALS__) return
         let interval: any
@@ -229,8 +244,6 @@ export function AppProvider({ children }: AppProviderProps) {
         }
     }, [])
 
-    // Listen for captures completed from Rust (system-wide, works even when app hidden)
-    // Handles both region (global overlay) and fullscreen (Rust hotkey) — deduped via URL check
     useEffect(() => {
         if (!(window as any).__TAURI_INTERNALS__) return
         let unlistenRegion: (() => void) | undefined
@@ -239,11 +252,10 @@ export function AppProvider({ children }: AppProviderProps) {
         let unlistenPerm: (() => void) | undefined
         const handleUploadEvent = (result: UploadCompleteEvent, title: string) => {
             if (!result?.url) return
-            // Deduplicate: if already in history, skip (prevents double-add when JS callback already handled)
-            const existing = loadUploadHistory().some(h => h.url === result.url)
-            if (existing) return
-            addToUploadHistory(result.url, result.name, result.file_type, result.size, undefined, result.id)
+
+            if (!addToUploadHistory(result.url, result.name, result.file_type, result.size, undefined, result.id)) return
             setHistory(loadUploadHistory())
+            playSound('uploadSuccess')
             notifications.notifyUpload(title, result.name, result.url)
             setScreenshotStatus(null)
             setShowRegionSelector(false)
@@ -315,8 +327,7 @@ export function AppProvider({ children }: AppProviderProps) {
         if (isVideoRecording) {
             await stopVideoRecording()
         } else {
-            // If we have a region selector, show it for region video; otherwise fullscreen
-            // For now, start fullscreen; region video via overlay will be added later
+
             await startVideoRecording(null)
         }
     }, [isVideoRecording, startVideoRecording, stopVideoRecording])
@@ -324,14 +335,31 @@ export function AppProvider({ children }: AppProviderProps) {
     const updateConfig = useCallback((newConfig: AppConfig) => {
         saveConfig(newConfig)
         setConfig(newConfig)
-        // Sync to Rust backend so global region overlay can use latest token without needing to read localStorage
+
         if ((window as any).__TAURI_INTERNALS__) {
             invoke('save_config', { config: newConfig as any }).catch((e) => console.warn('Failed to sync config to backend', e))
         }
     }, [])
 
+    useEffect(() => {
+        if (!(window as any).__TAURI_INTERNALS__ || !config?.uploadToken) return
+        invoke<{ id: string; name: string | null; email: string; image: string | null; urlId: string }>('emberly_get_profile', {
+            apiUrl: config.uploadUrl || 'https://embrly.ca',
+            token: config.uploadToken,
+        })
+            .then(profile => {
+                const current = config.user
+                const fresh = { id: profile.id, name: profile.name, email: profile.email, image: profile.image, urlId: profile.urlId }
+                if (JSON.stringify(current) !== JSON.stringify({ ...current, ...fresh })) {
+                    updateConfig({ ...config, user: { ...current, ...fresh } as AppConfig['user'] })
+                }
+            })
+            .catch(() => {})
+    }, [config?.uploadToken])
+
     const handleLogin = useCallback((uploadToken: string, user: LoginResponse['user']) => {
         if (uploadToken && user) {
+            logActivity('sign_in', `Signed in as ${user.name || user.email}`)
             const updatedConfig = {
                 ...(config || loadConfig()),
                 uploadToken,
@@ -348,6 +376,7 @@ export function AppProvider({ children }: AppProviderProps) {
     }, [config, notifications])
 
     const handleLogout = useCallback(() => {
+        logActivity('sign_out', 'Signed out')
         const updatedConfig = { ...(config || loadConfig()), uploadToken: '', user: undefined }
         saveConfig(updatedConfig)
         setConfig(updatedConfig)
@@ -358,9 +387,71 @@ export function AppProvider({ children }: AppProviderProps) {
         setActivePage('upload')
     }, [config])
 
+    useEffect(() => {
+        if (!(window as any).__TAURI_INTERNALS__) return
+        invoke<InstanceInfo>('emberly_get_instance', { apiUrl: config?.uploadUrl || 'https://embrly.ca' })
+            .then(info => setInstance({ ...DEFAULT_INSTANCE, ...info, features: { ...DEFAULT_INSTANCE.features, ...info.features } }))
+            .catch(() => {})
+    }, [config?.uploadUrl])
+
+    const refreshHistory = useCallback(async () => {
+        if (!(window as any).__TAURI_INTERNALS__ || !config?.uploadToken) return
+        try {
+            const base = (config.uploadUrl || 'https://embrly.ca').replace(/\/+$/, '')
+            const linkBase = config.preferredDomain ? `https://${config.preferredDomain}` : base
+            const res = await invoke<{ data?: AccountFile[] }>('emberly_list_files', {
+                apiUrl: base,
+                token: config.uploadToken,
+                page: 1,
+                limit: 100,
+            })
+            const files = res?.data ?? []
+            const remote: UploadHistoryItem[] = files.map(f => {
+                const url = `${linkBase}${f.urlPath}`
+                const previewable = f.mimeType?.startsWith('image/') && f.visibility === 'PUBLIC' && !f.hasPassword
+                return {
+                    url,
+                    name: f.name,
+                    timestamp: Date.parse(f.uploadedAt),
+                    fileType: f.mimeType,
+                    size: f.size * 1024 * 1024,
+                    thumbnailUrl: previewable ? `${url}/raw` : undefined,
+                    fileId: f.id,
+                }
+            })
+            const remoteIds = new Set(remote.map(r => r.fileId))
+            const oldest = remote.length ? Math.min(...remote.map(r => r.timestamp)) : Infinity
+            const local = loadUploadHistory().filter(h =>
+                h.fileId ? !remoteIds.has(h.fileId) && h.timestamp < oldest : true
+            )
+            const seen = new Set<string>()
+            const merged = [...remote, ...local]
+                .filter(h => {
+                    const key = h.fileId || h.url.replace(/\/+$/, '')
+                    if (seen.has(key)) return false
+                    seen.add(key)
+                    return true
+                })
+                .sort((a, b) => b.timestamp - a.timestamp)
+            saveUploadHistory(merged)
+            setHistory(merged)
+        } catch (error) {
+            console.warn('Could not load history from Emberly', error)
+        }
+    }, [config?.uploadToken, config?.uploadUrl, config?.preferredDomain])
+
+    useEffect(() => {
+        refreshHistory()
+    }, [refreshHistory])
+
+    useEffect(() => {
+        if (activePage === 'history') refreshHistory()
+    }, [activePage])
+
     const handleUploadComplete = useCallback((_filePath: string, response: UploadResponse) => {
-        addToUploadHistory(response.url, response.name, response.type, response.size, undefined, response.id)
+        if (!addToUploadHistory(response.url, response.name, response.type, response.size, undefined, response.id)) return
         setHistory(loadUploadHistory())
+        playSound('uploadSuccess')
         notifications.notifyUpload('Upload Complete', `${response.name} uploaded successfully`, response.url)
     }, [notifications])
 
@@ -386,17 +477,20 @@ export function AppProvider({ children }: AppProviderProps) {
 
     const handleCopyUrl = useCallback((url: string) => {
         navigator.clipboard.writeText(url)
+        playSound('copyLink')
     }, [])
 
     const handleScreenshotStart = useCallback(() => {
         setScreenshotStatus('Capturing...')
+        playSound('capture')
     }, [])
 
     const handleScreenshotHotkeyComplete = useCallback((result: UploadCompleteEvent) => {
         setScreenshotStatus(null)
         setShowRegionSelector(false)
-        addToUploadHistory(result.url, result.name, result.file_type, result.size, undefined, result.id)
+        if (!addToUploadHistory(result.url, result.name, result.file_type, result.size, undefined, result.id)) return
         setHistory(loadUploadHistory())
+        playSound('uploadSuccess')
         notifications.notifyUpload('Screenshot Uploaded', result.name, result.url)
     }, [notifications])
 
@@ -407,7 +501,7 @@ export function AppProvider({ children }: AppProviderProps) {
         notifications.notifyError('Screenshot Failed', error)
     }, [notifications])
 
-    const { takeFullscreenScreenshot, takeAllMonitorsScreenshot, takeRegionScreenshot, captureAndUploadRegion } = useHotkeys({
+    const { takeFullscreenScreenshot, takeAllMonitorsScreenshot, uploadClipboardImage, takeRegionScreenshot, captureAndUploadRegion } = useHotkeys({
         hotkeys: config?.hotkeys || DEFAULT_HOTKEYS,
         uploadToken: config?.uploadToken || '',
         visibility: config?.visibility || 'PUBLIC',
@@ -420,7 +514,6 @@ export function AppProvider({ children }: AppProviderProps) {
         onShowRegionSelector: () => setShowRegionSelector(true),
     })
 
-    // Handle tray-initiated captures (works even when window is hidden)
     useEffect(() => {
         if (!(window as any).__TAURI_INTERNALS__) return
         let unlistenTray: (() => void) | undefined
@@ -443,6 +536,7 @@ export function AppProvider({ children }: AppProviderProps) {
     }, [takeFullscreenScreenshot, takeAllMonitorsScreenshot, takeRegionScreenshot])
 
     const value: AppContextValue = {
+        instance,
         config,
         updateConfig,
         isLoggedIn: !!config?.uploadToken,
@@ -459,6 +553,7 @@ export function AppProvider({ children }: AppProviderProps) {
         screenshotStatus,
         takeFullscreenScreenshot,
         takeAllMonitorsScreenshot,
+        uploadClipboardImage,
         takeRegionScreenshot,
         captureAndUploadRegion,
         showRegionSelector,
@@ -478,4 +573,4 @@ export function AppProvider({ children }: AppProviderProps) {
 
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>
 }
-
+

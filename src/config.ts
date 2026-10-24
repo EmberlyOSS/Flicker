@@ -3,13 +3,15 @@ import { AppConfig, HotkeyConfig, UploadHistoryItem } from './types'
 const CONFIG_KEY = 'emberly_uploader_config'
 const UPLOAD_HISTORY_KEY = 'emberly_uploader_history'
 
+const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform || navigator.userAgent)
+
 export const DEFAULT_HOTKEYS: HotkeyConfig = {
   screenshotFullscreen: 'Control+Shift+S',
   screenshotRegion: 'Control+Shift+X',
   screenshotAllMonitors: 'Control+Shift+A',
   uploadClipboard: 'Control+Alt+U',
-  openApp: '',
-  recordVideo: 'Super+Shift+R',
+  openApp: 'Control+Alt+F',
+  recordVideo: isMac ? 'Super+Shift+R' : 'Control+Alt+R',
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -23,11 +25,11 @@ const DEFAULT_CONFIG: AppConfig = {
   hotkeys: DEFAULT_HOTKEYS,
   screenshotMode: 'primary',
   appearance: {
-    theme: 'dark',
+    theme: 'ember',
     backgroundOpacity: 0.95,
     fontScale: 'medium',
-    fontFamily: 'system',
-    borderRadius: 'medium',
+    fontFamily: 'inter',
+    borderRadius: 'large',
     sidebarPosition: 'left',
     compactMode: false,
     animations: true,
@@ -38,6 +40,7 @@ const DEFAULT_CONFIG: AppConfig = {
     clipboardFormat: 'url',
     playSound: true,
     startAtLogin: false,
+    closeAction: 'tray',
   },
   capture: {
     format: 'png',
@@ -57,10 +60,22 @@ const DEFAULT_CONFIG: AppConfig = {
   },
 }
 
+const OPEN_APP_MIGRATION_KEY = 'flicker-open-app-hotkey-migrated'
+
 export function loadConfig(): AppConfig {
   try {
     const stored = localStorage.getItem(CONFIG_KEY)
-    return stored ? { ...DEFAULT_CONFIG, ...JSON.parse(stored) } : DEFAULT_CONFIG
+    const config: AppConfig = stored ? { ...DEFAULT_CONFIG, ...JSON.parse(stored) } : DEFAULT_CONFIG
+    // Older versions saved an empty "open Flicker" shortcut, which left no way back once the window was closed.
+    if (!localStorage.getItem(OPEN_APP_MIGRATION_KEY)) {
+      localStorage.setItem(OPEN_APP_MIGRATION_KEY, '1')
+      if (config.hotkeys && !config.hotkeys.openApp) {
+        const migrated = { ...config, hotkeys: { ...config.hotkeys, openApp: DEFAULT_HOTKEYS.openApp } }
+        if (stored) saveConfig(migrated)
+        return migrated
+      }
+    }
+    return config
   } catch {
     return DEFAULT_CONFIG
   }
@@ -83,8 +98,9 @@ export function saveUploadHistory(history: UploadHistoryItem[]): void {
   localStorage.setItem(UPLOAD_HISTORY_KEY, JSON.stringify(history.slice(0, 100)))
 }
 
-export function addToUploadHistory(url: string, name: string, fileType?: string, size?: number, thumbnailUrl?: string, fileId?: string): void {
+export function addToUploadHistory(url: string, name: string, fileType?: string, size?: number, thumbnailUrl?: string, fileId?: string): boolean {
   const history = loadUploadHistory()
+  if (history.some(h => h.url === url || (fileId && h.fileId === fileId))) return false
   history.unshift({
     url,
     name,
@@ -95,6 +111,7 @@ export function addToUploadHistory(url: string, name: string, fileType?: string,
     fileId,
   })
   saveUploadHistory(history)
+  return true
 }
 
 function getMimeTypeFromUrl(url: string): string {

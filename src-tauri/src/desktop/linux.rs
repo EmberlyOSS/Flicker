@@ -1,8 +1,5 @@
-/// Linux-specific functionality
-
 use tauri::Emitter;
 
-/// Check if running with elevated privileges on Linux (root)
 pub fn is_admin() -> bool {
     #[cfg(unix)]
     {
@@ -12,7 +9,6 @@ pub fn is_admin() -> bool {
     false
 }
 
-/// Request elevation on Linux
 pub fn request_elevation(window: &tauri::WebviewWindow) {
     if !is_admin() {
         let _ = window.emit(
@@ -25,7 +21,6 @@ pub fn request_elevation(window: &tauri::WebviewWindow) {
     }
 }
 
-/// Get Linux-specific system info
 pub fn get_os_version() -> String {
     "Linux".to_string()
 }

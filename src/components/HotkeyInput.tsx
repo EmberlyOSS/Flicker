@@ -8,12 +8,8 @@ interface HotkeyInputProps {
   disabled?: boolean
 }
 
-// Platform detection for proper modifier display
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform || (navigator as any).userAgent || '')
 
-// Map browser key codes to Tauri shortcut format
-// On macOS, Meta (Command) should be stored as "Super" which global_hotkey maps to Command,
-// but we display it as "⌘" for familiarity.
 const KEY_MAP: Record<string, string> = {
   'Control': 'Control',
   'Shift': 'Shift',
@@ -35,16 +31,14 @@ const KEY_MAP: Record<string, string> = {
   'End': 'End',
   'PageUp': 'PageUp',
   'PageDown': 'PageDown',
-  // F keys
+
   'F1': 'F1', 'F2': 'F2', 'F3': 'F3', 'F4': 'F4',
   'F5': 'F5', 'F6': 'F6', 'F7': 'F7', 'F8': 'F8',
   'F9': 'F9', 'F10': 'F10', 'F11': 'F11', 'F12': 'F12',
 }
 
-// Modifiers in order they should appear — Super (Cmd) first on macOS for natural reading
 const MODIFIER_ORDER = isMac ? ['Super', 'Control', 'Shift', 'Alt'] : ['Control', 'Shift', 'Alt', 'Super']
 
-// Display name for modifiers (macOS shows ⌘ instead of Super)
 function displayModifier(mod: string): string {
   if (isMac) {
     if (mod === 'Super') return '⌘'
@@ -56,25 +50,21 @@ function displayModifier(mod: string): string {
 }
 
 function normalizeKey(key: string, code: string): string | null {
-  // Handle modifiers - they shouldn't be standalone
+
   if (['Control', 'Shift', 'Alt', 'Meta'].includes(key)) {
-    return null // We handle modifiers separately
+    return null
   }
-  
-  // Check key map
+
   if (KEY_MAP[key]) return KEY_MAP[key]
-  
-  // Single letter/number keys
+
   if (key.length === 1 && /[a-zA-Z0-9]/.test(key)) {
     return key.toUpperCase()
   }
-  
-  // Numpad keys
+
   if (code.startsWith('Numpad')) {
     return code.replace('Numpad', 'Num')
   }
-  
-  // Special characters
+
   const specialKeys: Record<string, string> = {
     ';': 'Semicolon',
     '=': 'Equal',
@@ -89,7 +79,7 @@ function normalizeKey(key: string, code: string): string | null {
     "'": 'Quote',
   }
   if (specialKeys[key]) return specialKeys[key]
-  
+
   return null
 }
 
@@ -99,7 +89,7 @@ export function HotkeyInput({ value, onChange, placeholder, disabled }: HotkeyIn
   const inputRef = useRef<HTMLInputElement>(null)
 
   const buildShortcut = useCallback((modifiers: string[], key: string | null): string => {
-    // Sort modifiers in standard order
+
     const sortedMods = MODIFIER_ORDER.filter(m => modifiers.includes(m))
     if (key) {
       return [...sortedMods, key].join('+')
@@ -109,7 +99,7 @@ export function HotkeyInput({ value, onChange, placeholder, disabled }: HotkeyIn
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (!isRecording) return
-    
+
     e.preventDefault()
     e.stopPropagation()
 
@@ -120,13 +110,11 @@ export function HotkeyInput({ value, onChange, placeholder, disabled }: HotkeyIn
     if (e.metaKey) modifiers.push('Super')
 
     const mainKey = normalizeKey(e.key, e.code)
-    
-    // Update current keys display
+
     const newKeys = new Set(modifiers)
     if (mainKey) newKeys.add(mainKey)
     setCurrentKeys(newKeys)
-    
-    // Only save if we have at least one modifier and a non-modifier key
+
     if (modifiers.length > 0 && mainKey) {
       const shortcut = buildShortcut(modifiers, mainKey)
       onChange(shortcut)
@@ -137,8 +125,7 @@ export function HotkeyInput({ value, onChange, placeholder, disabled }: HotkeyIn
 
   const handleKeyUp = useCallback(() => {
     if (!isRecording) return
-    
-    // Clear keys on all key releases
+
     setCurrentKeys(new Set())
   }, [isRecording])
 
@@ -170,7 +157,6 @@ export function HotkeyInput({ value, onChange, placeholder, disabled }: HotkeyIn
     setCurrentKeys(new Set())
   }
 
-  // Convert stored value to display-friendly (Super → ⌘ on mac)
   const formatDisplayValue = (val: string) => {
     if (!val) return ''
     return val.split('+').map(p => displayModifier(p.trim())).join(' + ')
@@ -191,8 +177,8 @@ export function HotkeyInput({ value, onChange, placeholder, disabled }: HotkeyIn
           w-full px-4 py-2.5 bg-background border rounded-lg text-sm
           flex items-center justify-between gap-2 cursor-pointer
           transition-all duration-200
-          ${isRecording 
-            ? 'border-primary ring-2 ring-primary/30 bg-primary/5' 
+          ${isRecording
+            ? 'border-primary ring-2 ring-primary/30 bg-primary/5'
             : 'border-input hover:border-primary/50'
           }
           ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
@@ -206,7 +192,7 @@ export function HotkeyInput({ value, onChange, placeholder, disabled }: HotkeyIn
             {displayValue}
           </span>
         </div>
-        
+
         <div className="flex items-center gap-1">
           {value && !isRecording && (
             <button
@@ -234,7 +220,7 @@ export function HotkeyInput({ value, onChange, placeholder, disabled }: HotkeyIn
           )}
         </div>
       </div>
-      
+
       {isRecording && (
         <p className="text-xs text-primary mt-1 animate-pulse">
           Press a key combination (e.g., {isMac ? '⌘+Shift+S' : 'Ctrl+Shift+S'})
@@ -244,12 +230,11 @@ export function HotkeyInput({ value, onChange, placeholder, disabled }: HotkeyIn
   )
 }
 
-// Display a hotkey in a nice badge format — shows ⌘ on macOS
 export function HotkeyBadge({ shortcut, className }: { shortcut: string; className?: string }) {
   if (!shortcut) return null
-  
+
   const keys = shortcut.split('+').map(k => displayModifier(k.trim()))
-  
+
   return (
     <div className={`flex items-center gap-1 ${className}`}>
       {keys.map((key, i) => (

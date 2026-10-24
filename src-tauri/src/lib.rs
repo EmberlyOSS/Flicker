@@ -1,8 +1,3 @@
-/// Flicker Tauri Backend - Screenshot and upload tool
-/// 
-/// This module provides a modular architecture for screenshot capture,
-/// file operations, and upload functionality with desktop and mobile support.
-
 pub mod common;
 pub mod platform;
 pub mod desktop;
@@ -16,22 +11,18 @@ use common::{
 use tauri_plugin_clipboard_manager::ClipboardExt as _;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-/// Global guard to prevent concurrent screenshot captures (fixes spam on rapid triggers)
 static SCREENSHOT_CAPTURING: AtomicBool = AtomicBool::new(false);
 
-// Platform-specific screenshot module
 #[cfg(feature = "desktop")]
 use desktop::screenshot;
 #[cfg(feature = "mobile")]
 use mobile::screenshot;
 
-/// Capture a screenshot of the entire screen or primary monitor
 #[tauri::command]
 async fn capture_screenshot(monitor_index: Option<usize>) -> Result<ScreenshotResult, String> {
     screenshot::capture_screenshot(monitor_index).await
 }
 
-/// Capture a specific region of the screen
 #[tauri::command]
 async fn capture_region(
     x: i32,
@@ -43,7 +34,6 @@ async fn capture_region(
     screenshot::capture_region(x, y, width, height, monitor_index).await
 }
 
-/// Get list of available monitors
 #[tauri::command]
 fn get_monitors() -> Result<Vec<serde_json::Value>, String> {
     let monitors = screenshot::get_monitors()?;
@@ -61,19 +51,16 @@ fn get_monitors() -> Result<Vec<serde_json::Value>, String> {
     }).collect())
 }
 
-/// Get the monitor index at a specific screen coordinate
 #[tauri::command]
 fn get_monitor_at_point(x: i32, y: i32) -> Result<Option<usize>, String> {
     screenshot::get_monitor_at_point(x, y)
 }
 
-/// Capture all monitors combined into a single image
 #[tauri::command]
 async fn capture_all_monitors() -> Result<ScreenshotResult, String> {
     screenshot::capture_all_monitors().await
 }
 
-/// Uploads a file to the Emberly instance
 #[tauri::command]
 async fn upload_file(
     window: tauri::Window,
@@ -83,6 +70,7 @@ async fn upload_file(
     visibility: String,
     password: Option<String>,
     domain: Option<String>,
+    discard_after: Option<bool>,
 ) -> Result<UploadResponse, String> {
     let progress_path = file_path.clone();
     let progress_window = window.clone();
@@ -111,10 +99,12 @@ async fn upload_file(
     )
     .await?;
 
-    // Emit success event with file path for preview
+    if discard_after.unwrap_or(false) {
+        common::discard_capture(&file_path);
+    }
     let event = common::create_upload_event(response.clone(), Some(file_path.clone()));
     desktop::app::emit_event(&window, "upload_complete", &event);
-    // Also ensure OS notification + history + clipboard even when app hidden (like other upload paths)
+
     let app_handle = window.app_handle();
     let _ = app_handle.clipboard().write_text(event.url.clone());
     desktop::app::send_os_notification(&app_handle, "Upload Complete", "URL copied to clipboard");
@@ -131,9 +121,6 @@ async fn upload_file(
     Ok(response)
 }
 
-/// Uploads whatever image is currently on the OS clipboard.
-/// Saves it to the screenshots directory first so it has a real file path,
-/// then reuses the standard upload flow.
 #[tauri::command]
 async fn upload_clipboard_image(
     app: tauri::AppHandle,
@@ -176,9 +163,10 @@ async fn upload_clipboard_image(
     )
     .await?;
 
+    common::discard_capture(&file_path);
     let event = common::create_upload_event(response.clone(), Some(file_path.clone()));
     desktop::app::emit_event(&window, "upload_complete", &event);
-    // Also ensure OS notification + clipboard + disk history (works even when app hidden)
+
     let app_handle = app.clone();
     let _ = app_handle.clipboard().write_text(event.url.clone());
     desktop::app::send_os_notification(&app_handle, "Upload Complete", "URL copied to clipboard");
@@ -196,8 +184,6 @@ async fn upload_clipboard_image(
     Ok(response)
 }
 
-/// Take screenshot, upload it, and return the URL
-/// Now handles clipboard + OS notification + history in Rust so it works even when frontend is hidden/backgrounded
 #[tauri::command]
 async fn screenshot_and_upload(
     window: tauri::Window,
@@ -208,15 +194,15 @@ async fn screenshot_and_upload(
     capture_all: Option<bool>,
     domain: Option<String>,
 ) -> Result<UploadCompleteEvent, String> {
-    println!("[Flicker] screenshot_and_upload invoked: capture_all={:?} monitor={:?} token_len={} api_url={}", capture_all, monitor_index, upload_token.len(), api_url);
-    eprintln!("[Flicker] screenshot_and_upload: visibility={} domain={:?}", visibility, domain);
-    // Guard against concurrent captures
+    crate::flog!("screenshot_and_upload invoked: capture_all={:?} monitor={:?} token_len={} api_url={}", capture_all, monitor_index, upload_token.len(), api_url);
+    crate::flog_err!("screenshot_and_upload: visibility={} domain={:?}", visibility, domain);
+
     if SCREENSHOT_CAPTURING.swap(true, Ordering::SeqCst) {
         return Err("Capture already in progress".to_string());
     }
 
     let result: Result<UploadCompleteEvent, String> = async {
-        // Check screen recording permission on macOS (same as region — prevents hang when denied)
+
         #[cfg(target_os = "macos")]
         {
             if !desktop::macos::has_screen_recording_permission() {
@@ -228,15 +214,12 @@ async fn screenshot_and_upload(
             }
         }
 
-        // Emit that we're starting
         desktop::app::emit_event(&window, "screenshot_started", serde_json::json!({}));
 
-        // Hide main window so Flicker doesn't appear in its own screenshot (user reported always included)
         let app_handle = window.app_handle().clone();
         desktop::region::hide_main_for_capture(&app_handle);
         tokio::time::sleep(std::time::Duration::from_millis(120)).await;
 
-        // Capture screenshot based on mode — wrap in timeout to avoid hanging “Capturing…” forever
         let capture_res = tokio::time::timeout(
             std::time::Duration::from_secs(8),
             async {
@@ -248,14 +231,13 @@ async fn screenshot_and_upload(
             },
         )
         .await;
-        // Restore immediately after capture attempt (before upload, so user sees app again quickly) — even on timeout/error
+
         desktop::region::restore_main_after_capture(&app_handle);
         let screenshot_result = capture_res
             .map_err(|_| "Screenshot capture timed out after 8s — check Screen Recording permission".to_string())??;
 
         desktop::app::emit_event(&window, "screenshot_captured", &screenshot_result);
 
-        // Upload it
         let upload_result = common::upload_file(
             screenshot_result.path.clone(),
             api_url,
@@ -267,9 +249,9 @@ async fn screenshot_and_upload(
         )
         .await?;
 
+        common::discard_capture(&screenshot_result.path);
         let event = common::create_upload_event(upload_result, Some(screenshot_result.path));
 
-        // Persist to disk history (so it survives app restarts and is visible when app returns)
         let _ = common::add_to_history(common::UploadHistoryItem {
             url: event.url.clone(),
             name: event.name.clone(),
@@ -279,15 +261,13 @@ async fn screenshot_and_upload(
             thumbnail_url: Some(event.url.clone()),
         });
 
-        // Copy URL to system clipboard (Rust side — works even when window hidden)
         let app_handle = window.app_handle();
         let _ = app_handle.clipboard().write_text(event.url.clone());
 
         desktop::app::send_os_notification(&app_handle, "Upload Complete", "URL copied to clipboard");
 
-        // Emit final event for frontend (in-app notification, history refresh)
         desktop::app::emit_event(&window, "screenshot_uploaded", &event);
-        // Also emit globally — frontend listens for upload_complete
+
         let _ = window.app_handle().emit("upload_complete", &event);
 
         Ok(event)
@@ -296,7 +276,6 @@ async fn screenshot_and_upload(
 
     SCREENSHOT_CAPTURING.store(false, Ordering::SeqCst);
 
-    // On error, also try to notify via OS notification
     if let Err(ref e) = result {
         desktop::app::send_os_notification(window.app_handle(), "Screenshot Failed", e);
     }
@@ -304,23 +283,20 @@ async fn screenshot_and_upload(
     result
 }
 
-/// Gets system information
 #[tauri::command]
 fn get_system_info() -> common::SystemInfo {
     platform::get_system_info()
 }
 
-/// Get screenshots directory path
 #[tauri::command]
 fn get_screenshots_path() -> Result<String, String> {
     let dir = get_screenshots_dir()?;
     Ok(dir.to_string_lossy().to_string())
 }
 
-/// Get test image path (icon.png)
 #[tauri::command]
 fn get_test_image_path(app_handle: tauri::AppHandle) -> Result<String, String> {
-    // 1. Try resource directory (Production)
+
     if let Ok(resource_dir) = app_handle.path().resource_dir() {
         let resource_path = resource_dir.join("icons").join("icon.png");
         if resource_path.exists() {
@@ -328,21 +304,18 @@ fn get_test_image_path(app_handle: tauri::AppHandle) -> Result<String, String> {
         }
     }
 
-    // 2. Try development icons directory (Relative to current dir)
     if let Ok(current_dir) = std::env::current_dir() {
         let dev_path = current_dir.join("src-tauri").join("icons").join("icon.png");
         if dev_path.exists() {
             return Ok(dev_path.to_string_lossy().to_string());
         }
 
-        // Try public dir fallback
         let public_path = current_dir.join("public").join("icon.png");
         if public_path.exists() {
             return Ok(public_path.to_string_lossy().to_string());
         }
     }
 
-    // 3. Try to find it in the project root if we're in src-tauri
     if let Ok(current_dir) = std::env::current_dir() {
         if current_dir.ends_with("src-tauri") {
             let root_path = current_dir
@@ -360,7 +333,6 @@ fn get_test_image_path(app_handle: tauri::AppHandle) -> Result<String, String> {
     Err("Could not find test image (icon.png) in any expected location".to_string())
 }
 
-/// Get current permission status
 #[tauri::command]
 fn get_permission_status() -> serde_json::Value {
     let status = common::get_permission_status();
@@ -371,7 +343,6 @@ fn get_permission_status() -> serde_json::Value {
     })
 }
 
-/// Get platform capabilities (what features are available)
 #[tauri::command]
 fn get_platform_capabilities() -> serde_json::Value {
     let caps = platform::get_capabilities();
@@ -389,7 +360,6 @@ fn get_platform_capabilities() -> serde_json::Value {
     })
 }
 
-/// Load app configuration from disk
 #[tauri::command]
 fn load_config() -> Result<serde_json::Value, String> {
     let config = common::load_config()?;
@@ -397,26 +367,33 @@ fn load_config() -> Result<serde_json::Value, String> {
         .map_err(|e| format!("Failed to serialize config: {}", e))?)
 }
 
-/// Save app configuration to disk
 #[tauri::command]
 fn save_config(app: tauri::AppHandle, config: serde_json::Value) -> Result<(), String> {
     let app_config: common::AppConfig = serde_json::from_value(config)
         .map_err(|e| format!("Failed to parse config: {}", e))?;
     let result = common::save_config(&app_config);
     if result.is_ok() {
-        // Re-register global hotkeys so new shortcuts take effect immediately — works even when app is backgrounded
+
         let _ = desktop::hotkeys::reregister_hotkeys(&app);
     }
     result
 }
 
-/// Re-register global hotkeys from current config (call after save_config or on demand)
 #[tauri::command]
 fn reregister_hotkeys(app: tauri::AppHandle) -> Result<(), String> {
     desktop::hotkeys::reregister_hotkeys(&app)
 }
 
-/// Load upload history from disk
+#[tauri::command]
+fn get_backend_logs() -> Vec<String> {
+    common::logs::recent()
+}
+
+#[tauri::command]
+fn get_hotkey_status() -> std::collections::HashMap<String, String> {
+    desktop::hotkeys::hotkey_failures()
+}
+
 #[tauri::command]
 fn load_history() -> Result<Vec<serde_json::Value>, String> {
     let history = common::load_history()?;
@@ -425,7 +402,6 @@ fn load_history() -> Result<Vec<serde_json::Value>, String> {
         .collect())
 }
 
-/// Add item to upload history
 #[tauri::command]
 fn add_to_history(item: serde_json::Value) -> Result<(), String> {
     let history_item: common::UploadHistoryItem = serde_json::from_value(item)
@@ -433,13 +409,11 @@ fn add_to_history(item: serde_json::Value) -> Result<(), String> {
     common::add_to_history(history_item)
 }
 
-/// Clear all upload history
 #[tauri::command]
 fn clear_history() -> Result<(), String> {
     common::clear_history()
 }
 
-/// Login to Emberly with email/username and password
 #[tauri::command]
 async fn emberly_login(
     api_url: String,
@@ -451,12 +425,11 @@ async fn emberly_login(
     let response = client
         .login(email_or_username, password, two_factor_code)
         .await?;
-    
+
     Ok(serde_json::to_value(response)
         .map_err(|e| format!("Failed to serialize login response: {}", e))?)
 }
 
-/// Get user profile from Emberly
 #[tauri::command]
 async fn emberly_get_profile(
     api_url: String,
@@ -464,12 +437,11 @@ async fn emberly_get_profile(
 ) -> Result<serde_json::Value, String> {
     let client = common::EmberlyCient::new(api_url);
     let profile = client.get_profile(&token).await?;
-    
+
     Ok(serde_json::to_value(profile)
         .map_err(|e| format!("Failed to serialize profile: {}", e))?)
 }
 
-/// Validate an Emberly upload token
 #[tauri::command]
 async fn emberly_validate_token(
     api_url: String,
@@ -479,7 +451,6 @@ async fn emberly_validate_token(
     client.validate_token(&token).await
 }
 
-/// Upload a file to Emberly
 #[tauri::command]
 async fn emberly_upload_file(
     api_url: String,
@@ -497,7 +468,6 @@ async fn emberly_upload_file(
         .map_err(|e| format!("Failed to serialize upload response: {}", e))?)
 }
 
-/// Get user statistics from Emberly
 #[tauri::command]
 async fn emberly_get_stats(
     api_url: String,
@@ -510,7 +480,6 @@ async fn emberly_get_stats(
         .map_err(|e| format!("Failed to serialize stats: {}", e))?)
 }
 
-/// Delete a file from Emberly
 #[tauri::command]
 async fn emberly_delete_file(
     api_url: String,
@@ -521,7 +490,6 @@ async fn emberly_delete_file(
     client.delete_file(&token, &file_id).await
 }
 
-/// Get the user's custom domains and domain-slot usage
 #[tauri::command]
 async fn emberly_get_domains(
     api_url: String,
@@ -534,7 +502,46 @@ async fn emberly_get_domains(
         .map_err(|e| format!("Failed to serialize domains: {}", e))?)
 }
 
-/// Get the user's active perk bonuses
+fn device_name() -> String {
+    let from_env = std::env::var("COMPUTERNAME").or_else(|_| std::env::var("HOSTNAME")).ok();
+    let name = from_env.or_else(|| {
+        std::process::Command::new("hostname")
+            .output()
+            .ok()
+            .and_then(|o| String::from_utf8(o.stdout).ok())
+    });
+    name.map(|n| n.trim().trim_end_matches(".local").to_string())
+        .filter(|n| !n.is_empty())
+        .unwrap_or_else(|| "this computer".to_string())
+}
+
+#[tauri::command]
+async fn device_sign_in_start(api_url: String) -> Result<serde_json::Value, String> {
+    common::EmberlyCient::new(api_url).start_device_sign_in(&device_name()).await
+}
+
+#[tauri::command]
+async fn device_sign_in_poll(api_url: String, device_code: String) -> Result<serde_json::Value, String> {
+    common::EmberlyCient::new(api_url).poll_device_sign_in(&device_code).await
+}
+
+#[tauri::command]
+async fn emberly_get_instance(api_url: String) -> Result<serde_json::Value, String> {
+    common::EmberlyCient::new(api_url).get_instance().await
+}
+
+#[tauri::command]
+async fn emberly_list_files(
+    api_url: String,
+    token: String,
+    page: Option<u32>,
+    limit: Option<u32>,
+) -> Result<serde_json::Value, String> {
+    common::EmberlyCient::new(api_url)
+        .list_files(&token, page.unwrap_or(1), limit.unwrap_or(50).min(100))
+        .await
+}
+
 #[tauri::command]
 async fn emberly_get_perks(
     api_url: String,
@@ -547,7 +554,6 @@ async fn emberly_get_perks(
         .map_err(|e| format!("Failed to serialize perks: {}", e))?)
 }
 
-/// Shorten a URL via the Emberly URL shortener
 #[tauri::command]
 async fn emberly_shorten_url(
     api_url: String,
@@ -561,7 +567,6 @@ async fn emberly_shorten_url(
         .map_err(|e| format!("Failed to serialize shortened url: {}", e))?)
 }
 
-/// Update a file's visibility and/or password
 #[tauri::command]
 async fn emberly_update_file(
     api_url: String,
@@ -574,37 +579,31 @@ async fn emberly_update_file(
     client.update_file(&token, &file_id, visibility, password).await
 }
 
-/// Get device information for support/diagnostics
 #[tauri::command]
 fn get_device_info() -> Result<common::DeviceInfo, String> {
     Ok(common::get_device_info())
 }
 
-/// Get audit logs (optionally limited to last N entries)
 #[tauri::command]
 fn get_audit_logs(limit: Option<usize>) -> Result<Vec<common::AuditLogEntry>, String> {
     common::get_audit_logs(limit)
 }
 
-/// Get audit logs with device info appended for support export
 #[tauri::command]
 fn get_audit_logs_with_device() -> Result<Vec<common::AuditLogEntry>, String> {
     common::get_audit_logs_with_device_info(None)
 }
 
-/// Export audit logs as JSON string for user sharing
 #[tauri::command]
 fn export_audit_logs() -> Result<String, String> {
     common::export_audit_logs()
 }
 
-/// Clear all audit logs
 #[tauri::command]
 fn clear_audit_logs() -> Result<(), String> {
     common::clear_audit_logs()
 }
 
-/// Log an event to the audit system (for frontend-initiated events)
 #[tauri::command]
 fn log_event(
     event_type: String,
@@ -615,11 +614,6 @@ fn log_event(
     common::log_event(&event_type, &message, &level, metadata)
 }
 
-// ============================================================================
-// Notification Commands
-// ============================================================================
-
-/// Add a new notification
 #[tauri::command]
 fn notification_add(
     priority: String,
@@ -650,71 +644,56 @@ fn notification_add(
     common::add_notification(priority, category, title, message, persistent, action_label, action_id, metadata)
 }
 
-/// Get all notifications
 #[tauri::command]
 fn notification_get_all(include_dismissed: bool) -> Result<Vec<common::Notification>, String> {
     common::get_notifications(None, include_dismissed)
 }
 
-/// Get unread notification count
 #[tauri::command]
 fn notification_get_unread_count() -> Result<usize, String> {
     common::get_unread_count()
 }
 
-/// Mark a notification as read
 #[tauri::command]
 fn notification_mark_read(id: String) -> Result<(), String> {
     common::mark_as_read(&id)
 }
 
-/// Mark all notifications as read
 #[tauri::command]
 fn notification_mark_all_read() -> Result<(), String> {
     common::mark_all_as_read()
 }
 
-/// Dismiss a notification
 #[tauri::command]
 fn notification_dismiss(id: String) -> Result<(), String> {
     common::dismiss_notification(&id)
 }
 
-/// Delete a notification permanently
 #[tauri::command]
 fn notification_delete(id: String) -> Result<(), String> {
     common::delete_notification(&id)
 }
 
-/// Clear all notifications
 #[tauri::command]
 fn notification_clear_all(include_system: bool) -> Result<(), String> {
     common::clear_notifications(include_system)
 }
 
-/// Check for system notifications on startup
 #[tauri::command]
 fn notification_check_system() -> Vec<common::Notification> {
     common::check_system_notifications()
 }
 
-// ============================================================================
-// Region Capture (Global Overlay) Commands
-// ============================================================================
-
-/// Start global region capture overlay (system-wide, works when main window is hidden)
 #[tauri::command]
 async fn start_region_capture(app: tauri::AppHandle) -> Result<(), String> {
     desktop::region::start_region_capture(app).await
 }
 
-/// Cancel / close the region overlay
 #[tauri::command]
 fn cancel_region_capture(app: tauri::AppHandle) -> Result<(), String> {
     desktop::region::cancel_region_capture(&app)
 }
 
-/// Confirm region capture from overlay window - captures region and returns file path
 #[tauri::command]
 async fn confirm_region_capture(
     app: tauri::AppHandle,
@@ -728,7 +707,6 @@ async fn confirm_region_capture(
     desktop::region::confirm_region_capture(app, monitor_index, x, y, width, height, scale_factor).await
 }
 
-/// Capture region and upload in one call (used by overlay for full flow)
 #[tauri::command]
 async fn capture_region_and_upload(
     app: tauri::AppHandle,
@@ -759,7 +737,6 @@ async fn capture_region_and_upload(
     .await
 }
 
-/// Check screen recording permission (macOS)
 #[tauri::command]
 fn check_screen_recording_permission() -> bool {
     #[cfg(target_os = "macos")]
@@ -772,7 +749,6 @@ fn check_screen_recording_permission() -> bool {
     }
 }
 
-/// Request screen recording permission (macOS) and open settings if needed
 #[tauri::command]
 fn request_screen_recording_permission() -> Result<bool, String> {
     #[cfg(target_os = "macos")]
@@ -782,7 +758,7 @@ fn request_screen_recording_permission() -> Result<bool, String> {
             return Ok(true);
         }
         let _ = desktop::macos::request_screen_recording_permission();
-        // Give system a moment then check again
+
         let has_now = desktop::macos::has_screen_recording_permission();
         if !has_now {
             desktop::macos::open_screen_recording_settings();
@@ -796,7 +772,6 @@ fn request_screen_recording_permission() -> Result<bool, String> {
     }
 }
 
-/// Capture window under cursor (single-click without drag) and upload — fixes Helium tabs not captured
 #[tauri::command]
 async fn capture_window_and_upload(
     app: tauri::AppHandle,
@@ -815,54 +790,67 @@ async fn capture_window_and_upload(
     .await
 }
 
-/// Check accessibility permission (macOS — needed for global shortcuts in background)
 #[tauri::command]
 fn check_accessibility_permission() -> bool {
-    desktop::macos::has_accessibility_permission()
+    #[cfg(target_os = "macos")]
+    return desktop::macos::has_accessibility_permission();
+    #[cfg(not(target_os = "macos"))]
+    true
 }
 
-/// Request accessibility permission (opens System Settings)
 #[tauri::command]
 fn request_accessibility_permission() -> Result<bool, String> {
-    if desktop::macos::has_accessibility_permission() {
-        return Ok(true);
+    #[cfg(target_os = "macos")]
+    {
+        if !desktop::macos::has_accessibility_permission() {
+            desktop::macos::open_accessibility_settings();
+        }
+        return Ok(desktop::macos::has_accessibility_permission());
     }
-    desktop::macos::open_accessibility_settings();
-    // On macOS, AXIsProcessTrusted will be true only after user grants and restarts
-    Ok(desktop::macos::has_accessibility_permission())
+    #[cfg(not(target_os = "macos"))]
+    Ok(true)
 }
 
-/// Check if app is allowed to run in background (Login Item)
 #[tauri::command]
 fn check_background_permission(app: tauri::AppHandle) -> bool {
-    desktop::macos::is_background_enabled(&app)
+    #[cfg(target_os = "macos")]
+    return desktop::macos::is_background_enabled(&app);
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+        true
+    }
 }
 
-/// Enable background execution (adds to Login Items)
 #[tauri::command]
 fn enable_background(app: tauri::AppHandle) -> Result<bool, String> {
-    desktop::macos::enable_background(&app)
+    #[cfg(target_os = "macos")]
+    return desktop::macos::enable_background(&app);
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+        Ok(true)
+    }
 }
 
-/// Open background items settings
 #[tauri::command]
 fn open_background_settings() {
+    #[cfg(target_os = "macos")]
     desktop::macos::open_background_settings();
 }
 
-/// Open Screen Recording settings (macOS)
 #[tauri::command]
 fn open_screen_recording_settings() {
+    #[cfg(target_os = "macos")]
     desktop::macos::open_screen_recording_settings();
 }
 
-/// Open Accessibility settings (macOS)
 #[tauri::command]
 fn open_accessibility_settings() {
+    #[cfg(target_os = "macos")]
     desktop::macos::open_accessibility_settings();
 }
 
-/// Start native video recording (mp4, 10m max, no ffmpeg)
 #[tauri::command]
 async fn start_video_recording(
     app: tauri::AppHandle,
@@ -871,7 +859,6 @@ async fn start_video_recording(
     desktop::video::start_video_recording(&app, options).await
 }
 
-/// Stop video recording and optionally upload
 #[tauri::command]
 async fn stop_video_recording(
     app: tauri::AppHandle,
@@ -880,19 +867,16 @@ async fn stop_video_recording(
     desktop::video::stop_video_recording(&app, auto_upload).await
 }
 
-/// Cancel video recording
 #[tauri::command]
 async fn cancel_video_recording(app: tauri::AppHandle) -> Result<(), String> {
     desktop::video::cancel_video_recording(&app).await
 }
 
-/// Get video recording status
 #[tauri::command]
 fn get_recording_status() -> desktop::video::VideoRecordingStatus {
     desktop::video::get_recording_status()
 }
 
-/// Toggle video recording
 #[tauri::command]
 async fn toggle_video_recording(app: tauri::AppHandle) -> Result<(), String> {
     desktop::video::toggle_video_recording(app).await
@@ -901,39 +885,29 @@ async fn toggle_video_recording(app: tauri::AppHandle) -> Result<(), String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default();
-    
-    // Setup plugins
+
     builder = desktop::app::setup_plugins(builder);
-    
-    // Setup the app
+
     builder
         .setup(|tauri_app| {
-            // Open devtools in debug builds to help with debugging
+
             #[cfg(debug_assertions)]
             {
                 if let Some(window) = tauri_app.get_webview_window("main") {
                     window.open_devtools();
                 }
             }
-            
-            // Setup system tray and window handlers (non-blocking)
+
             #[cfg(not(mobile))]
             {
-                // Run as menu-bar (accessory) app on macOS so Flicker lives in the
-                // menu bar / tray, not the Dock. LSUIElement in Info.plist covers
-                // the bundled app; this covers `tauri dev` too.
-                #[cfg(target_os = "macos")]
-                {
-                    let _ = tauri_app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-                }
+
                 desktop::app::setup_system_tray(tauri_app)?;
                 desktop::app::setup_window_handlers(tauri_app)?;
-                // Register global hotkeys in Rust so captures work even when main window is hidden/backgrounded
-                // (fixes: “need to go back into app to upload”)
+
                 let app_handle = tauri_app.handle().clone();
                 let _ = desktop::hotkeys::reregister_hotkeys(&app_handle);
             }
-            
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -962,6 +936,10 @@ pub fn run() {
             emberly_get_stats,
             emberly_delete_file,
             emberly_get_domains,
+            emberly_list_files,
+            device_sign_in_start,
+            device_sign_in_poll,
+            emberly_get_instance,
             emberly_get_perks,
             emberly_shorten_url,
             emberly_update_file,
@@ -1000,7 +978,16 @@ pub fn run() {
             get_recording_status,
             toggle_video_recording,
             reregister_hotkeys,
+            get_hotkey_status,
+            get_backend_logs,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app, _event| {
+            // Clicking Flicker in the Dock or Finder while it's already running.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { .. } = _event {
+                let _ = desktop::app::show_window(_app);
+            }
+        });
 }

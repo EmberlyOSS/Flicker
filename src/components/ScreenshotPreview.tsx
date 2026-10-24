@@ -7,7 +7,6 @@ interface ScreenshotPreviewProps {
   autoCloseMs?: number
 }
 
-// This component is kept for compatibility but notifications are now handled in useHotkeys
 export function ScreenshotPreview({
   upload,
   onClose,
@@ -16,7 +15,6 @@ export function ScreenshotPreview({
   useEffect(() => {
     if (!upload) return
 
-    // Auto-close after delay
     const timer = setTimeout(() => {
       onClose()
     }, autoCloseMs)
@@ -24,6 +22,5 @@ export function ScreenshotPreview({
     return () => clearTimeout(timer)
   }, [upload, autoCloseMs, onClose])
 
-  // Notifications handled by useHotkeys, this just manages the state cleanup
   return null
 }

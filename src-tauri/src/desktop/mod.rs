@@ -1,5 +1,3 @@
-/// Desktop platform module - Windows, macOS, Linux specific code
-
 pub mod screenshot;
 pub mod app;
 pub mod region;

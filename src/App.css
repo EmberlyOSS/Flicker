@@ -1,4 +1,3 @@
-/* Animation Utilities */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -55,39 +54,35 @@
   animation: spin 1s linear infinite;
 }
 
-/* Responsive Utilities */
 * {
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
 }
 
-/* Mobile-first base styles */
 body {
-  font-size: 16px; /* Prevents zoom on input focus on iOS */
+  font-size: 16px;
   overflow-x: hidden;
 }
 
-/* Touch-friendly button minimum sizes */
-button, a, [role="button"] {
-  min-height: 44px;
-  min-width: 44px;
+@media (pointer: coarse) {
+  button, a, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
 }
 
-/* Tablet layout adjustments */
 @media (min-width: 641px) and (max-width: 1024px) {
   body {
     font-size: 15px;
   }
 }
 
-/* Desktop layout */
 @media (min-width: 1025px) {
   body {
     font-size: 16px;
   }
 }
 
-/* Safe area insets for notched devices */
 @supports (padding: max(0px)) {
   body {
     padding-left: max(0px, env(safe-area-inset-left));
@@ -95,24 +90,20 @@ button, a, [role="button"] {
   }
 }
 
-/* Prevent horizontal scroll on mobile */
 html, body {
   overflow-x: hidden;
   width: 100%;
 }
 
-/* Better scroll behavior */
 html {
   scroll-behavior: smooth;
 }
 
-/* Improve legibility */
 body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom Titlebar Styles */
 .titlebar {
   -webkit-app-region: drag;
   user-select: none;
@@ -124,7 +115,6 @@ body {
   -webkit-app-region: no-drag;
 }
 
-/* Prevent titlebar buttons from having min-width */
 .titlebar-button {
   min-width: unset;
   min-height: unset;

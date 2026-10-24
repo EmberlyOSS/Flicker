@@ -1,11 +1,3 @@
-/**
- * Desktop platform-specific capabilities and functions
- *
- * This module provides functions and structures to determine the capabilities of the desktop platform
- * on which the application is running. It includes information about native screenshot support, region capture,
- * and other platform-specific features.
- */
-
 use super::detection::PlatformType;
 
 pub struct DesktopCapabilities {
