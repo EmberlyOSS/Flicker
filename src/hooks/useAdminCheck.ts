@@ -6,9 +6,6 @@ export interface AdminCheckResult {
   checkComplete: boolean
 }
 
-/**
- * 
- */
 export function useAdminCheck() {
   const [adminStatus, setAdminStatus] = useState<AdminCheckResult>({
     isAdmin: false,

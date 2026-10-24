@@ -13,7 +13,7 @@ export function UpdateNotification({ updateInfo, onDownload, onDismiss }: Update
   return (
     <div className="fixed top-4 right-4 z-50 animate-slide-up">
       <div className="glass-card w-80 overflow-hidden shadow-2xl border border-primary/30">
-        {/* Header */}
+
         <div className="flex items-center justify-between px-4 py-3 bg-primary/10 border-b border-primary/20">
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-primary" />
@@ -30,7 +30,6 @@ export function UpdateNotification({ updateInfo, onDownload, onDismiss }: Update
           </button>
         </div>
 
-        {/* Content */}
         <div className="p-4 space-y-3">
           <div>
             <p className="text-sm text-foreground font-medium">
@@ -43,11 +42,10 @@ export function UpdateNotification({ updateInfo, onDownload, onDismiss }: Update
             )}
           </div>
 
-          {/* Progress bar when downloading */}
           {updateInfo.downloading && (
             <div className="space-y-2">
               <div className="h-2 bg-secondary/30 rounded-full overflow-hidden">
-                <div 
+                <div
                   className="h-full bg-primary rounded-full transition-all duration-300"
                   style={{ width: `${updateInfo.progress || 0}%` }}
                 />
@@ -58,14 +56,12 @@ export function UpdateNotification({ updateInfo, onDownload, onDismiss }: Update
             </div>
           )}
 
-          {/* Error message */}
           {updateInfo.error && (
             <p className="text-xs text-destructive">
               {updateInfo.error}
             </p>
           )}
 
-          {/* Actions */}
           {!updateInfo.downloading && (
             <div className="flex gap-2">
               <button

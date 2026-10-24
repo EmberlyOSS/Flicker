@@ -14,7 +14,7 @@ interface UseHotkeysOptions {
   onScreenshotStart?: () => void;
   onUploadComplete?: (result: UploadCompleteEvent) => void;
   onError?: (error: string) => void;
-  /** Called when the region hotkey is pressed — consumer must show the selector UI */
+
   onShowRegionSelector?: () => void;
 }
 
@@ -22,12 +22,10 @@ export function useHotkeys(options: UseHotkeysOptions) {
   const isCapturingRef = useRef(false);
   const optionsRef = useRef(options);
 
-  // Keep options ref updated
   useEffect(() => {
     optionsRef.current = options;
   }, [options]);
 
-  // Take screenshot - calls Rust backend
   const takeScreenshot = useCallback(async (captureAll: boolean = false) => {
     console.log('[Flicker][JS] takeScreenshot called captureAll=', captureAll, 'isCapturing=', isCapturingRef.current);
     if (isCapturingRef.current) {
@@ -47,7 +45,7 @@ export function useHotkeys(options: UseHotkeysOptions) {
     console.log('[Flicker][JS] invoking screenshot_and_upload ...');
 
     try {
-      // Let Rust handle everything
+
       const result = await invoke<UploadCompleteEvent>('screenshot_and_upload', {
         apiUrl: opts.apiUrl,
         uploadToken: opts.uploadToken,
@@ -59,8 +57,7 @@ export function useHotkeys(options: UseHotkeysOptions) {
       console.log('[Flicker][JS] screenshot_and_upload success url=', result.url);
 
       if (result.url) {
-        // Rust already handled clipboard + OS notification (works even when app hidden/backgrounded)
-        // We just ensure clipboard fallback and in-app notification via onUploadComplete
+
         try { await writeText(result.url).catch(() => {}) } catch {}
         opts.onUploadComplete?.(result);
       }
@@ -77,10 +74,6 @@ export function useHotkeys(options: UseHotkeysOptions) {
   const takeFullscreenScreenshot = useCallback(() => takeScreenshot(false), [takeScreenshot]);
   const takeAllMonitorsScreenshot = useCallback(() => takeScreenshot(true), [takeScreenshot]);
 
-  /**
-   * Directly capture + upload a region given screen coordinates.
-   * Called by the RegionSelector overlay after the user finishes dragging.
-   */
   const captureAndUploadRegion = useCallback(async (x: number, y: number, width: number, height: number) => {
     if (isCapturingRef.current) return;
 
@@ -91,7 +84,7 @@ export function useHotkeys(options: UseHotkeysOptions) {
     isCapturingRef.current = true;
 
     try {
-      // 1. Capture the region via Rust
+
       const screenshotResult = await invoke<{ path: string; width: number; height: number }>('capture_region', {
         x: Math.round(x),
         y: Math.round(y),
@@ -100,7 +93,6 @@ export function useHotkeys(options: UseHotkeysOptions) {
         monitorIndex: null,
       });
 
-      // 2. Upload the saved file
       const uploadResponse = await invoke<UploadResponse>('upload_file', {
         filePath: screenshotResult.path,
         apiUrl: opts.apiUrl,
@@ -108,11 +100,12 @@ export function useHotkeys(options: UseHotkeysOptions) {
         visibility: opts.visibility,
         password: null,
         domain: opts.domain || null,
+        discardAfter: true,
       });
 
       if (uploadResponse.url) {
         try { await writeText(uploadResponse.url).catch(() => {}) } catch {}
-        // This is the in-app fallback path (not global overlay) — show OS notification here
+
         try { await sendNotification({ title: 'Upload Complete', body: 'Region URL copied to clipboard' }) } catch {}
         opts.onUploadComplete?.({
           id: uploadResponse.id,
@@ -132,12 +125,11 @@ export function useHotkeys(options: UseHotkeysOptions) {
     }
   }, []);
 
-  /** Triggers the region selector overlay (via hotkey or button). Uses global system-wide overlay. */
   const takeRegionScreenshot = useCallback(async () => {
     console.log('[Flicker][JS] takeRegionScreenshot called');
-    // Try global overlay first (works even when app is in background / hidden)
+
     try {
-      // Check macOS screen recording permission first
+
       try {
         const hasPermission = await invoke<boolean>('check_screen_recording_permission');
         console.log('[Flicker][JS] check_screen_recording_permission ->', hasPermission);
@@ -162,18 +154,17 @@ export function useHotkeys(options: UseHotkeysOptions) {
     } catch (e) {
       console.error('[Flicker][JS] Global region capture failed, trying in-app fallback', e);
       const msg = e instanceof Error ? e.message : String(e);
-      // If it's a permission error, don't fallback - show error
+
       if (msg.includes('Screen Recording') || msg.includes('permission')) {
         optionsRef.current.onError?.(msg);
         return;
       }
-      // Fallback to in-app selector (for browser preview or if overlay creation failed)
+
       console.log('[Flicker][JS] falling back to in-app RegionSelector');
       optionsRef.current.onShowRegionSelector?.();
     }
   }, []);
 
-  // Upload whatever image is currently on the clipboard
   const uploadClipboardImage = useCallback(async () => {
     if (isCapturingRef.current) return;
 
@@ -197,7 +188,7 @@ export function useHotkeys(options: UseHotkeysOptions) {
 
       if (response.url) {
         try { await writeText(response.url).catch(() => {}) } catch {}
-        // Rust already did OS notification for clipboard path; in-app via onUploadComplete
+
         opts.onUploadComplete?.({
           id: response.id,
           url: response.url,
@@ -215,12 +206,6 @@ export function useHotkeys(options: UseHotkeysOptions) {
       isCapturingRef.current = false;
     }
   }, []);
-
-  // Global shortcuts are registered by the Rust backend. Keeping a second
-  // registration here races the backend handler and can make one keypress
-  // start/stop a recording (or start two captures). The hook still exposes
-  // the capture functions for buttons and tray events, but intentionally does
-  // not register system-wide shortcuts in the webview.
 
   return { takeFullscreenScreenshot, takeAllMonitorsScreenshot, uploadClipboardImage, takeRegionScreenshot, captureAndUploadRegion };
 }

@@ -7,7 +7,10 @@ import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { BehaviorConfig, UploadProgress, UploadResponse } from '../../types'
 import { formatForClipboard } from '../../utils/clipboardFormat'
-import { Upload, Copy, Check, AlertCircle, Loader2, FileUp, Link2, X, RotateCcw, ExternalLink, Crosshair, Video, Square, Circle } from 'lucide-react'
+import { Upload, Copy, Check, AlertCircle, Loader2, FileUp, X, RotateCcw, ExternalLink, Crosshair, Video, Square, Circle, Monitor, Layers, ClipboardPaste, Image as ImageIcon, ArrowRight } from 'lucide-react'
+import { useApp } from '../../context/AppContext'
+import { DEFAULT_HOTKEYS } from '../../config'
+import { Kbd, Section, timeAgo } from '../ui/kit'
 import { API_URL } from '../../constants'
 
 interface UploadAreaProps {
@@ -17,7 +20,7 @@ interface UploadAreaProps {
   password?: string
   domain?: string
   behavior?: BehaviorConfig
-  /** Called when user clicks "Capture Region" — should show the region selector */
+
   onCaptureRegion?: () => void
   isVideoRecording?: boolean
   videoElapsed?: number
@@ -46,6 +49,8 @@ export function UploadArea({ onUpload, uploadToken, visibility, password, domain
   const [isDragging, setIsDragging] = useState(false)
   const [files, setFiles] = useState<QueuedFile[]>([])
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const { config, history, setActivePage, takeFullscreenScreenshot, takeAllMonitorsScreenshot, uploadClipboardImage } = useApp()
+  const hotkeys = { ...DEFAULT_HOTKEYS, ...config?.hotkeys }
 
   const uploadOne = useCallback(
     async (path: string, existingId?: string) => {
@@ -60,7 +65,7 @@ export function UploadArea({ onUpload, uploadToken, visibility, password, domain
       try {
         const response = await invoke<UploadResponse>('upload_file', {
           filePath: path,
-          apiUrl: API_URL,
+          apiUrl: config?.uploadUrl || API_URL,
           uploadToken,
           visibility,
           password: password || null,
@@ -90,7 +95,7 @@ export function UploadArea({ onUpload, uploadToken, visibility, password, domain
         setFiles(prev => prev.map(f => (f.id === id ? { ...f, status: 'error', progress: 0, error: message } : f)))
       }
     },
-    [uploadToken, visibility, password, domain, onUpload, behavior]
+    [uploadToken, visibility, password, domain, onUpload, behavior, config?.uploadUrl]
   )
 
   const handleFiles = useCallback(
@@ -114,8 +119,7 @@ export function UploadArea({ onUpload, uploadToken, visibility, password, domain
     [uploadToken, uploadOne]
   )
 
-  // Real drag-and-drop: Tauri's webview-level API gives us actual file paths,
-  // which the browser's HTML5 DataTransfer never exposes inside a Tauri app.
+  // Tauri's drag-drop event gives real file paths, which HTML5 DataTransfer never exposes in a Tauri app.
   useEffect(() => {
     let unlisten: (() => void) | undefined
     getCurrentWebview()
@@ -135,7 +139,6 @@ export function UploadArea({ onUpload, uploadToken, visibility, password, domain
     return () => unlisten?.()
   }, [handleFiles])
 
-  // Live upload progress per file, streamed from the Rust backend
   useEffect(() => {
     let unlisten: (() => void) | undefined
     listen<UploadProgressEvent>('upload_progress', event => {
@@ -181,175 +184,167 @@ export function UploadArea({ onUpload, uploadToken, visibility, password, domain
   }
 
   const isUploading = files.some(f => f.status === 'uploading')
+  const recent = history.slice(0, 6)
+  const recordingTime = `${Math.floor((videoElapsed || 0) / 60)}:${((videoElapsed || 0) % 60).toString().padStart(2, '0')}`
+
+  const actions = [
+    { label: 'Region', description: 'Select an area', icon: Crosshair, shortcut: hotkeys.screenshotRegion, run: onCaptureRegion },
+    { label: 'Screen', description: 'Current screen', icon: Monitor, shortcut: hotkeys.screenshotFullscreen, run: takeFullscreenScreenshot },
+    { label: 'All screens', description: 'Every monitor', icon: Layers, shortcut: hotkeys.screenshotAllMonitors, run: takeAllMonitorsScreenshot },
+    { label: 'Clipboard', description: 'Upload a copied image', icon: ClipboardPaste, shortcut: hotkeys.uploadClipboard, run: uploadClipboardImage },
+  ]
 
   return (
-    <div className="space-y-4">
-      {/* Upload Zone */}
-      <div
-        className={`upload-zone p-8 transition-all duration-200 ${isDragging ? 'dragging' : ''}`}
-      >
-        <div className="flex flex-col items-center gap-6">
-          <div
-            className={`p-6 rounded-2xl transition-all duration-300 ${
-              isDragging ? 'bg-primary/20 animate-pulse-soft' : 'bg-secondary/50 hover:bg-primary/10'
-            }`}
-          >
-            <FileUp size={48} className={isDragging ? 'text-primary' : 'text-muted-foreground'} />
-          </div>
-
-          <div className="text-center space-y-2">
-            <h3 className="text-lg font-semibold text-foreground">
-              {isDragging ? 'Drop to upload' : 'Drop files here'}
-            </h3>
-            <p className="text-sm text-muted-foreground">or click below to select one or more files</p>
-          </div>
-
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        {actions.map(action => (
           <button
-            onClick={handleSelectFile}
-            className="btn-primary px-8 py-3 flex items-center gap-2"
+            key={action.label}
+            onClick={() => action.run?.()}
+            disabled={!action.run}
+            className="glass-card glass-hover group flex flex-col items-start gap-3 p-4 text-left disabled:opacity-50"
           >
-            <Upload size={18} />
-            Select Files
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20 transition-colors group-hover:bg-primary/20">
+              <action.icon size={17} className="text-primary" />
+            </div>
+            <div className="space-y-0.5">
+              <p className="text-sm font-medium text-foreground">{action.label}</p>
+              <p className="text-xs text-muted-foreground">{action.description}</p>
+            </div>
+            <Kbd shortcut={action.shortcut} />
           </button>
-
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            {onCaptureRegion && (
-              <button
-                onClick={onCaptureRegion}
-                className="btn-secondary px-6 py-2.5 flex items-center gap-2 text-sm"
-                title="Select a region of the screen to capture and upload"
-              >
-                <Crosshair size={16} />
-                Capture Region
-              </button>
+        ))}
+        {onToggleVideo && (
+          <button
+            onClick={onToggleVideo}
+            className={`glass-card glass-hover group flex flex-col items-start gap-3 p-4 text-left ${isVideoRecording ? 'border-red-500/50 bg-red-500/10' : ''}`}
+          >
+            <div className={`flex h-9 w-9 items-center justify-center rounded-lg ring-1 transition-colors ${isVideoRecording ? 'bg-red-500 ring-red-500/40' : 'bg-primary/10 ring-primary/20 group-hover:bg-primary/20'}`}>
+              {isVideoRecording ? <Square size={14} className="fill-white text-white" /> : <Video size={17} className="text-primary" />}
+            </div>
+            <div className="space-y-0.5">
+              <p className="text-sm font-medium text-foreground">{isVideoRecording ? 'Stop recording' : 'Record'}</p>
+              <p className="text-xs text-muted-foreground">{isVideoRecording ? `Recording ${recordingTime}` : 'Screen to MP4'}</p>
+            </div>
+            {isVideoRecording ? (
+              <span className="flex items-center gap-1.5 text-[11px] font-medium text-red-400">
+                <Circle size={7} className="animate-pulse fill-red-500 text-red-500" />
+                Live
+              </span>
+            ) : (
+              <Kbd shortcut={hotkeys.recordVideo} />
             )}
-            {onToggleVideo && (
-              <button
-                onClick={onToggleVideo}
-                className={`px-6 py-2.5 flex items-center gap-2 text-sm font-medium rounded-xl border transition-all ${
-                  isVideoRecording
-                    ? 'bg-red-500 text-white border-red-600 animate-pulse'
-                    : 'btn-secondary'
-                }`}
-                title={isVideoRecording ? 'Stop recording (max 10m)' : 'Record screen to mp4 (Super+Shift+R)'}
-              >
-                {isVideoRecording ? <Square size={16} className="fill-white" /> : <Video size={16} />}
-                {isVideoRecording
-                  ? `Stop (${Math.floor((videoElapsed || 0) / 60)
-                      .toString()
-                      .padStart(2, '0')}:${((videoElapsed || 0) % 60).toString().padStart(2, '0')})`
-                  : 'Record Video'}
-                {!isVideoRecording && <span className="ml-1 text-[10px] opacity-70 hidden sm:inline">Super+Shift+R</span>}
-                {isVideoRecording && <Circle size={8} className="fill-white animate-ping ml-1" />}
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <kbd className="px-2 py-1 bg-secondary/50 rounded font-mono border border-border">
-              Ctrl+Shift+U
-            </kbd>
-            <span>Quick upload</span>
-          </div>
-        </div>
+          </button>
+        )}
       </div>
 
-      {/* File queue */}
-      {files.map(file => (
-        <div
-          key={file.id}
-          className={`glass-card border-l-4 p-4 animate-slide-up ${
-            file.status === 'error'
-              ? 'border-l-destructive'
-              : file.status === 'done'
-              ? 'border-l-primary glow-primary-subtle'
-              : 'border-l-primary/50'
-          }`}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3 flex-1 min-w-0">
-              <div className="flex-shrink-0 mt-0.5">
-                {file.status === 'uploading' && <Loader2 size={20} className="text-primary animate-spin" />}
-                {file.status === 'done' && (
-                  <div className="p-1 rounded-lg bg-primary/20">
-                    <Check size={14} className="text-primary" />
-                  </div>
-                )}
-                {file.status === 'error' && <AlertCircle size={20} className="text-destructive" />}
-              </div>
-              <div className="flex-1 min-w-0 space-y-1">
-                <p className="font-medium text-sm text-foreground truncate">{file.name}</p>
-                {file.status === 'uploading' && (
-                  <div className="space-y-1">
-                    <div className="h-1.5 w-full rounded-full bg-secondary/50 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-primary transition-all duration-150"
-                        style={{ width: `${Math.max(2, file.progress)}%` }}
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground">{Math.round(file.progress)}%</p>
-                  </div>
-                )}
-                {file.status === 'error' && <p className="text-xs text-muted-foreground">{file.error}</p>}
-                {file.status === 'done' && file.url && (
-                  <div className="flex items-center gap-2 mt-1">
-                    <Link2 size={12} className="text-muted-foreground flex-shrink-0" />
-                    <p className="text-xs font-mono text-muted-foreground truncate">{file.url}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {file.status === 'error' && (
-                <button
-                  onClick={() => handleRetry(file)}
-                  title="Retry"
-                  className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded transition-all"
-                >
-                  <RotateCcw size={16} />
-                </button>
-              )}
-              {file.status === 'done' && file.url && (
-                <>
-                  <button
-                    onClick={() => handleCopy(file)}
-                    title="Copy"
-                    className={`p-1.5 rounded transition-all ${
-                      copiedId === file.id
-                        ? 'text-primary bg-primary/10'
-                        : 'text-muted-foreground hover:text-primary hover:bg-primary/10'
-                    }`}
-                  >
-                    {copiedId === file.id ? <Check size={16} /> : <Copy size={16} />}
-                  </button>
-                  <a
-                    href={file.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title="Open"
-                    className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded transition-all"
-                  >
-                    <ExternalLink size={16} />
-                  </a>
-                </>
-              )}
-              <button
-                onClick={() => handleDismiss(file.id)}
-                title="Dismiss"
-                className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded transition-all"
-              >
-                <X size={16} />
-              </button>
-            </div>
+      <div
+        className={`flex flex-col items-center justify-between gap-4 rounded-xl border-2 border-dashed px-5 py-5 transition-colors sm:flex-row ${
+          isDragging ? 'border-primary bg-primary/5' : 'border-border/80 bg-card/40'
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <FileUp size={22} className={isDragging ? 'text-primary' : 'text-muted-foreground'} />
+          <div>
+            <p className="text-sm font-medium text-foreground">{isDragging ? 'Drop to upload' : 'Drag files here to upload'}</p>
+            <p className="text-xs text-muted-foreground">Anywhere in this window works. Links are copied automatically.</p>
           </div>
         </div>
-      ))}
+        <button
+          onClick={handleSelectFile}
+          className="flex shrink-0 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+        >
+          <Upload size={15} />
+          Choose files
+        </button>
+      </div>
 
-      {isUploading && files.length > 1 && (
-        <p className="text-xs text-center text-muted-foreground">
-          Uploading {files.filter(f => f.status === 'uploading').length} of {files.length} files…
-        </p>
+      {files.length > 0 && (
+        <div className="space-y-2">
+          {files.map(file => (
+            <div key={file.id} className="glass-card flex items-center gap-3 px-4 py-3 animate-slide-up">
+              <div className="shrink-0">
+                {file.status === 'uploading' && <Loader2 size={18} className="animate-spin text-primary" />}
+                {file.status === 'done' && <Check size={18} className="text-emerald-500" />}
+                {file.status === 'error' && <AlertCircle size={18} className="text-destructive" />}
+              </div>
+              <div className="min-w-0 flex-1 space-y-1">
+                <p className="truncate text-sm font-medium text-foreground">{file.name}</p>
+                {file.status === 'uploading' && (
+                  <div className="flex items-center gap-2">
+                    <div className="h-1 flex-1 overflow-hidden rounded-full bg-secondary">
+                      <div className="h-full rounded-full bg-primary transition-[width] duration-150" style={{ width: `${Math.max(2, file.progress)}%` }} />
+                    </div>
+                    <span className="w-9 text-right text-[11px] tabular-nums text-muted-foreground">{Math.round(file.progress)}%</span>
+                  </div>
+                )}
+                {file.status === 'error' && <p className="text-xs text-destructive">{file.error}</p>}
+                {file.status === 'done' && file.url && <p className="truncate font-mono text-xs text-muted-foreground">{file.url}</p>}
+              </div>
+              <div className="flex shrink-0 items-center gap-0.5">
+                {file.status === 'error' && (
+                  <button onClick={() => handleRetry(file)} title="Retry" className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+                    <RotateCcw size={15} />
+                  </button>
+                )}
+                {file.status === 'done' && file.url && (
+                  <>
+                    <button onClick={() => handleCopy(file)} title="Copy link" className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+                      {copiedId === file.id ? <Check size={15} className="text-emerald-500" /> : <Copy size={15} />}
+                    </button>
+                    <button onClick={() => file.url && openUrl(file.url).catch(() => {})} title="Open" className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+                      <ExternalLink size={15} />
+                    </button>
+                  </>
+                )}
+                <button onClick={() => handleDismiss(file.id)} title="Dismiss" className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+                  <X size={15} />
+                </button>
+              </div>
+            </div>
+          ))}
+          {isUploading && files.length > 1 && (
+            <p className="text-center text-xs text-muted-foreground">
+              Uploading {files.filter(f => f.status === 'uploading').length} of {files.length} files…
+            </p>
+          )}
+        </div>
+      )}
+
+      {recent.length > 0 && (
+        <Section
+          icon={ImageIcon}
+          title="Recent uploads"
+          action={
+            <button onClick={() => setActivePage('history')} className="flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+              View all
+              <ArrowRight size={12} />
+            </button>
+          }
+        >
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+            {recent.map(item => (
+              <button
+                key={item.url}
+                onClick={() => openUrl(item.url).catch(() => {})}
+                title={item.name}
+                className="group overflow-hidden rounded-lg border border-border/70 bg-secondary/30 text-left transition-colors hover:border-primary/40"
+              >
+                <div className="flex aspect-[4/3] items-center justify-center overflow-hidden bg-secondary/40">
+                  {item.thumbnailUrl ? (
+                    <img src={item.thumbnailUrl} alt="" loading="lazy" className="h-full w-full object-cover" onError={e => (e.currentTarget.style.display = 'none')} />
+                  ) : (
+                    <FileUp size={18} className="text-muted-foreground" />
+                  )}
+                </div>
+                <div className="px-2 py-1.5">
+                  <p className="truncate text-[11px] font-medium text-foreground">{item.name}</p>
+                  <p className="text-[10px] text-muted-foreground">{timeAgo(item.timestamp)}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </Section>
       )}
     </div>
   )

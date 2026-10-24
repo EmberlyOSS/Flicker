@@ -1,14 +1,14 @@
-/// Configuration file management
-/// 
-/// Handles loading and saving app configuration to the system config directory
-
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 fn default_fps() -> u32 { 30 }
 fn default_max_duration() -> u32 { 600 }
-fn default_record_video() -> String { "Super+Shift+R".to_string() }
+fn default_record_video() -> String {
+    if cfg!(target_os = "macos") { "Super+Shift+R" } else { "Control+Alt+R" }.to_string()
+}
 fn default_true() -> bool { true }
+fn default_close_action() -> String { "tray".to_string() }
+pub const DEFAULT_OPEN_APP_HOTKEY: &str = "Control+Alt+F";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -16,22 +16,22 @@ pub struct AppConfig {
     pub upload_token: String,
     #[serde(alias = "uploadUrl")]
     pub upload_url: Option<String>,
-    pub visibility: String,  // "PUBLIC" or "PRIVATE"
+    pub visibility: String,
     pub password: Option<String>,
     #[serde(alias = "autoUpload", default)]
     pub auto_upload: bool,
     #[serde(alias = "defaultNotification", default)]
     pub default_notification: bool,
-    
+
     #[serde(default, alias = "appearance")]
     pub appearance: AppearanceConfig,
-    
+
     #[serde(default, alias = "behavior")]
     pub behavior: BehaviorConfig,
-    
+
     #[serde(default, alias = "capture")]
     pub capture: CaptureConfig,
-    
+
     #[serde(default, alias = "hotkeys")]
     pub hotkeys: HotkeyConfig,
 
@@ -45,7 +45,7 @@ pub struct AppearanceConfig {
     #[serde(alias = "backgroundOpacity", default)]
     pub background_opacity: f32,
     #[serde(alias = "fontScale", default)]
-    pub font_scale: String,  // "small", "medium", "large"
+    pub font_scale: String,
     #[serde(default, alias = "customColors")]
     pub custom_colors: Option<CustomColors>,
 }
@@ -60,20 +60,23 @@ pub struct CustomColors {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BehaviorConfig {
     #[serde(alias = "postUploadAction", default)]
-    pub post_upload_action: String,  // "copy", "open", "none"
+    pub post_upload_action: String,
     #[serde(alias = "clipboardFormat", default)]
-    pub clipboard_format: String,    // "url", "raw-url", "markdown", "html"
+    pub clipboard_format: String,
     #[serde(alias = "playSound", default)]
     pub play_sound: bool,
     #[serde(alias = "startAtLogin", default)]
     pub start_at_login: bool,
+    /// "tray" keeps Flicker running in the tray or menu bar, "minimize" sends it to the taskbar or Dock, "quit" exits.
+    #[serde(alias = "closeAction", default = "default_close_action")]
+    pub close_action: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CaptureConfig {
-    pub format: String,  // "png" or "jpg"
-    pub quality: u32,    // 1-100 for jpg
-    pub delay: u32,      // seconds
+    pub format: String,
+    pub quality: u32,
+    pub delay: u32,
     #[serde(alias = "filenamePattern", default)]
     pub filename_pattern: String,
     #[serde(alias = "saveLocally", default)]
@@ -132,6 +135,7 @@ impl Default for BehaviorConfig {
             clipboard_format: "url".to_string(),
             play_sound: true,
             start_at_login: false,
+            close_action: default_close_action(),
         }
     }
 }
@@ -169,8 +173,8 @@ impl Default for HotkeyConfig {
             screenshot_region: "Control+Shift+X".to_string(),
             screenshot_all_monitors: "Control+Shift+A".to_string(),
             upload_clipboard: "Control+Alt+U".to_string(),
-            open_app: String::new(),
-            record_video: "Super+Shift+R".to_string(),
+            open_app: DEFAULT_OPEN_APP_HOTKEY.to_string(),
+            record_video: default_record_video(),
         }
     }
 }
@@ -193,55 +197,52 @@ impl Default for AppConfig {
     }
 }
 
-/// Get the config directory path (~/.config/flicker on Linux/macOS, %APPDATA%\Emberly\Flicker on Windows)
 pub fn get_config_dir() -> Result<PathBuf, String> {
     let config_dir = dirs::config_dir()
         .ok_or("Could not find config directory")?
         .join("Emberly")
         .join("Flicker");
-    
+
     if !config_dir.exists() {
         std::fs::create_dir_all(&config_dir)
             .map_err(|e| format!("Failed to create config directory: {}", e))?;
     }
-    
+
     Ok(config_dir)
 }
 
-/// Load configuration from disk
 pub fn load_config() -> Result<AppConfig, String> {
     let config_dir = get_config_dir()?;
     let config_path = config_dir.join("config.json");
-    
+
     if !config_path.exists() {
-        println!("[Flicker] load_config: no file at {:?}, using default (token empty)", config_path);
+        crate::flog!("load_config: no file at {:?}, using default (token empty)", config_path);
         return Ok(AppConfig::default());
     }
-    
+
     let content = std::fs::read_to_string(&config_path)
         .map_err(|e| format!("Failed to read config file: {}", e))?;
-    println!("[Flicker] load_config: read {} bytes from {:?}", content.len(), config_path);
-    
+    crate::flog!("load_config: read {} bytes from {:?}", content.len(), config_path);
+
     let cfg: AppConfig = serde_json::from_str(&content)
         .map_err(|e| format!("Failed to parse config file: {}", e))?;
-    println!("[Flicker] load_config: token_len={} hotkeys: fullscreen='{}' region='{}' record_video='{}' video: sys_audio={} mic={} fps={}", 
+    crate::flog!("load_config: token_len={} hotkeys: fullscreen='{}' region='{}' record_video='{}' video: sys_audio={} mic={} fps={}",
         cfg.upload_token.len(), cfg.hotkeys.screenshot_fullscreen, cfg.hotkeys.screenshot_region, cfg.hotkeys.record_video,
         cfg.video.include_system_audio, cfg.video.include_mic, cfg.video.fps);
     Ok(cfg)
 }
 
-/// Save configuration to disk
 pub fn save_config(config: &AppConfig) -> Result<(), String> {
     let config_dir = get_config_dir()?;
     let config_path = config_dir.join("config.json");
-    
+
     let json = serde_json::to_string_pretty(config)
         .map_err(|e| format!("Failed to serialize config: {}", e))?;
-    println!("[Flicker] save_config: writing {} bytes token_len={} to {:?}", json.len(), config.upload_token.len(), config_path);
-    
+    crate::flog!("save_config: writing {} bytes token_len={} to {:?}", json.len(), config.upload_token.len(), config_path);
+
     std::fs::write(&config_path, json)
         .map_err(|e| format!("Failed to write config file: {}", e))?;
-    
-    println!("[Flicker] save_config: done");
+
+    crate::flog!("save_config: done");
     Ok(())
 }

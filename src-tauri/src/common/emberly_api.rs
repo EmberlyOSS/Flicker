@@ -1,18 +1,11 @@
-/// Emberly API client module
-/// 
-/// Provides a clean, reusable interface for interacting with the Emberly API
-/// Handles authentication, file uploads, and user operations
-
 use serde::{Deserialize, Serialize};
 
-/// Emberly API client configuration
 #[derive(Clone)]
 pub struct EmberlyCient {
     base_url: String,
     client: reqwest::Client,
 }
 
-/// Login request payload
 #[derive(Debug, Serialize)]
 pub struct LoginRequest {
     #[serde(rename = "emailOrUsername")]
@@ -22,7 +15,6 @@ pub struct LoginRequest {
     pub two_factor_code: Option<String>,
 }
 
-/// Login response from API
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct LoginResponse {
     pub success: bool,
@@ -32,12 +24,12 @@ pub struct LoginResponse {
     pub requires_2fa: Option<bool>,
 }
 
-/// User information returned from login
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct LoginUser {
     pub id: String,
     pub name: Option<String>,
-    pub email: String,
+    #[serde(default)]
+    pub email: Option<String>,
     #[serde(rename = "uploadToken")]
     pub upload_token: String,
     pub image: Option<String>,
@@ -45,32 +37,25 @@ pub struct LoginUser {
     pub url_id: String,
 }
 
-/// User profile information (subset of `GET /api/profile`'s response —
-/// that endpoint also returns embedded `files`/`shortenedUrls` arrays we
-/// don't need here and intentionally leave untyped so serde ignores them).
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct UserProfile {
     pub id: String,
     pub name: Option<String>,
-    pub email: String,
+    #[serde(default)]
+    pub email: Option<String>,
     pub image: Option<String>,
     #[serde(rename = "urlId")]
     pub url_id: String,
 }
 
-/// Envelope used by endpoints that wrap their payload as `{ success, data }`
-/// (e.g. `/api/profile`, `/api/urls`).
 #[derive(Debug, Deserialize)]
 struct DataEnvelope<T> {
     data: T,
 }
 
-/// File upload response
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct UploadResponse {
-    /// The uploaded file's database id. Optional for resilience against
-    /// older server versions or transitional deploys — always present on a
-    /// current server.
+
     pub id: Option<String>,
     pub url: String,
     pub name: String,
@@ -79,7 +64,6 @@ pub struct UploadResponse {
     pub file_type: String,
 }
 
-/// A single custom domain (`GET /api/domains`)
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DomainInfo {
     pub id: String,
@@ -91,7 +75,6 @@ pub struct DomainInfo {
     pub cf_status: Option<String>,
 }
 
-/// Domain slot usage/limits, embedded in the `/api/domains` response
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DomainLimit {
     pub allowed: Option<u32>,
@@ -104,8 +87,6 @@ pub struct DomainLimit {
     pub unlimited: bool,
 }
 
-/// `GET /api/domains` response (returned as a raw object, not wrapped in
-/// `{success, data}` — confirmed against the actual route handler).
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DomainsResponse {
     pub domains: Vec<DomainInfo>,
@@ -113,7 +94,6 @@ pub struct DomainsResponse {
     pub domain_limit: DomainLimit,
 }
 
-/// Perk bonus summary fields (`GET /api/profile/perks`)
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct PerkBonuses {
     pub storage: Option<String>,
@@ -129,16 +109,12 @@ pub struct PerksSummary {
     pub bonuses: PerkBonuses,
 }
 
-/// `GET /api/profile/perks` response (raw object, not `{success, data}`).
-/// Individual perk entries vary in shape by perk type, so they're left as
-/// loosely-typed JSON values — only the summary is rendered in Settings.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct PerksResponse {
     pub perks: Vec<serde_json::Value>,
     pub summary: PerksSummary,
 }
 
-/// A shortened URL (`POST`/`GET /api/urls`)
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ShortenedUrlResponse {
     pub id: String,
@@ -151,13 +127,12 @@ pub struct ShortenedUrlResponse {
     pub created_at: String,
 }
 
-/// Basic usage aggregates embedded in `/api/analytics/summary`
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct AnalyticsBasic {
     #[serde(rename = "totalFiles")]
     pub total_files: u64,
     #[serde(rename = "storageUsed")]
-    pub storage_used: u64,
+    pub storage_used: f64,
     #[serde(rename = "totalUrls")]
     pub total_urls: u64,
     #[serde(rename = "totalUrlClicks")]
@@ -188,7 +163,7 @@ pub struct AnalyticsAllowed {
 pub struct RecentUpload {
     pub id: String,
     pub name: String,
-    pub size: u64,
+    pub size: f64,
     #[serde(rename = "uploadedAt")]
     pub uploaded_at: String,
     pub views: u64,
@@ -201,10 +176,6 @@ pub struct UploadsPerDay {
     pub count: u64,
 }
 
-/// `GET /api/analytics/summary` response (raw object, not `{success, data}`).
-/// The server also includes plan-gated extra lists (`topFiles`,
-/// `topStorageFiles`, `topUrls`, `files`) that aren't modeled here — serde
-/// ignores unknown fields by default, and the Stats page MVP doesn't need them.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct AnalyticsSummary {
     pub plan: String,
@@ -216,7 +187,6 @@ pub struct AnalyticsSummary {
     pub uploads_per_day: Vec<UploadsPerDay>,
 }
 
-/// API error response
 #[derive(Debug, Deserialize)]
 pub struct ApiError {
     pub success: bool,
@@ -225,7 +195,7 @@ pub struct ApiError {
 }
 
 impl EmberlyCient {
-    /// Create a new Emberly API client
+
     pub fn new(base_url: String) -> Self {
         Self {
             base_url,
@@ -233,12 +203,64 @@ impl EmberlyCient {
         }
     }
 
-    /// Create a new client with the default Emberly URL
+    pub async fn start_device_sign_in(&self, device_name: &str) -> Result<serde_json::Value, String> {
+        let response = self
+            .client
+            .post(format!("{}/api/device/code", self.base_url))
+            .json(&serde_json::json!({ "clientId": "flicker", "deviceName": device_name }))
+            .send()
+            .await
+            .map_err(|e| format!("Could not reach Emberly: {}", e))?;
+        let ok = response.status().is_success();
+        let body: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| format!("Unexpected response from Emberly: {}", e))?;
+        if !ok {
+            return Err(body.get("error").and_then(|e| e.as_str()).unwrap_or("Sign-in isn't available").to_string());
+        }
+        Ok(body.get("data").cloned().unwrap_or(body))
+    }
+
+    pub async fn poll_device_sign_in(&self, device_code: &str) -> Result<serde_json::Value, String> {
+        let response = self
+            .client
+            .post(format!("{}/api/device/token", self.base_url))
+            .json(&serde_json::json!({ "deviceCode": device_code }))
+            .send()
+            .await
+            .map_err(|e| format!("Could not reach Emberly: {}", e))?;
+        let body: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| format!("Unexpected response from Emberly: {}", e))?;
+        if let Some(error) = body.get("error").and_then(|e| e.as_str()) {
+            return Err(error.to_string());
+        }
+        Ok(body.get("data").cloned().unwrap_or(body))
+    }
+
+    pub async fn get_instance(&self) -> Result<serde_json::Value, String> {
+        let response = self
+            .client
+            .get(format!("{}/api/instance", self.base_url))
+            .send()
+            .await
+            .map_err(|e| format!("Could not reach Emberly: {}", e))?;
+        if !response.status().is_success() {
+            return Err(format!("Instance info unavailable ({})", response.status()));
+        }
+        let body: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| format!("Unexpected response from Emberly: {}", e))?;
+        Ok(body.get("data").cloned().unwrap_or(body))
+    }
+
     pub fn default_client() -> Self {
         Self::new("https://embrly.ca".to_string())
     }
 
-    /// Login to Emberly with email/username and password
     pub async fn login(
         &self,
         email_or_username: String,
@@ -275,7 +297,6 @@ impl EmberlyCient {
             .map_err(|e| format!("Failed to parse login response: {}", e))
     }
 
-    /// Get user profile information
     pub async fn get_profile(&self, token: &str) -> Result<UserProfile, String> {
         let url = format!("{}/api/profile", self.base_url);
 
@@ -303,14 +324,10 @@ impl EmberlyCient {
         Ok(envelope.data)
     }
 
-    /// Validate an upload token. There's no dedicated validation endpoint on
-    /// the server, so this just checks whether the token can successfully
-    /// fetch the profile it authenticates.
     pub async fn validate_token(&self, token: &str) -> Result<bool, String> {
         Ok(self.get_profile(token).await.is_ok())
     }
 
-    /// Get the user's custom domains and domain-slot usage
     pub async fn get_domains(&self, token: &str) -> Result<DomainsResponse, String> {
         let url = format!("{}/api/domains", self.base_url);
 
@@ -336,7 +353,31 @@ impl EmberlyCient {
             .map_err(|e| format!("Failed to parse domains response: {}", e))
     }
 
-    /// Get the user's active perk bonuses (Discord booster / GitHub contributor)
+    pub async fn list_files(&self, token: &str, page: u32, limit: u32) -> Result<serde_json::Value, String> {
+        let url = format!("{}/api/files?page={}&limit={}&sortBy=newest", self.base_url, page, limit);
+
+        let response = self
+            .client
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", token))
+            .send()
+            .await
+            .map_err(|e| format!("Files request failed: {}", e))?;
+
+        if !response.status().is_success() {
+            return Err(format!(
+                "Failed to list files with status {}: {}",
+                response.status(),
+                response.text().await.unwrap_or_default()
+            ));
+        }
+
+        response
+            .json::<serde_json::Value>()
+            .await
+            .map_err(|e| format!("Failed to parse files response: {}", e))
+    }
+
     pub async fn get_perks(&self, token: &str) -> Result<PerksResponse, String> {
         let url = format!("{}/api/profile/perks", self.base_url);
 
@@ -362,7 +403,6 @@ impl EmberlyCient {
             .map_err(|e| format!("Failed to parse perks response: {}", e))
     }
 
-    /// Shorten a URL
     pub async fn shorten_url(
         &self,
         token: &str,
@@ -395,7 +435,6 @@ impl EmberlyCient {
         Ok(envelope.data)
     }
 
-    /// Update a file's visibility and/or password
     pub async fn update_file(
         &self,
         token: &str,
@@ -433,8 +472,6 @@ impl EmberlyCient {
         Ok(())
     }
 
-    /// Upload a file to Emberly, optionally reporting progress as bytes are
-    /// streamed from disk to the request body (called as `(uploaded, total)`).
     pub async fn upload_file(
         &self,
         token: &str,
@@ -468,8 +505,6 @@ impl EmberlyCient {
             .unwrap_or("application/octet-stream")
             .to_string();
 
-        // Stream the file so we can report upload progress as chunks are read,
-        // instead of loading the whole file into memory up front.
         let uploaded = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
         let stream = tokio_util::io::ReaderStream::new(file).map(move |chunk| {
             if let Ok(bytes) = &chunk {
@@ -488,7 +523,6 @@ impl EmberlyCient {
             .mime_str(&mime_type)
             .map_err(|e| e.to_string())?;
 
-        // Create multipart form
         let mut form = reqwest::multipart::Form::new()
             .part("file", part)
             .text("visibility", visibility.to_string());
@@ -530,7 +564,6 @@ impl EmberlyCient {
             .map_err(|e| format!("Failed to parse upload response: {}", e))
     }
 
-    /// Chunked upload — initialize session
     pub async fn init_chunked_upload(
         &self,
         token: &str,
@@ -548,7 +581,7 @@ impl EmberlyCient {
         if let Some(d) = domain {
             body["domain"] = serde_json::Value::String(d);
         }
-        println!("[Flicker] init_chunked: POST {} body={} token_len={}", url, body, token.len());
+        crate::flog!("init_chunked: POST {} body={} token_len={}", url, body, token.len());
         let resp = self
             .client
             .post(&url)
@@ -559,12 +592,12 @@ impl EmberlyCient {
             .map_err(|e| format!("Init chunked upload failed: {}", e))?;
         let status = resp.status();
         let text = resp.text().await.unwrap_or_default();
-        println!("[Flicker] init_chunked resp status={} body={}", status, text);
+        crate::flog!("init_chunked resp status={} body={}", status, text);
         if !status.is_success() {
             return Err(format!("Init chunked failed {}: {}", status, text));
         }
         let json: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
-        // Server may wrap in {success, data: {uploadId, partSize}} or return flat
+
         let data = json.get("data").unwrap_or(&json);
         let upload_id = data
             .get("uploadId")
@@ -581,7 +614,7 @@ impl EmberlyCient {
             .or_else(|| json.get("part_size"))
             .and_then(|v| v.as_u64())
             .unwrap_or(5 * 1024 * 1024);
-        println!("[Flicker] init_chunked: uploadId={} partSize={} raw={}", upload_id, part_size, json);
+        crate::flog!("init_chunked: uploadId={} partSize={} raw={}", upload_id, part_size, json);
         Ok((upload_id, part_size))
     }
 
@@ -595,7 +628,7 @@ impl EmberlyCient {
             "{}/api/files/chunks/{}/part/{}",
             self.base_url, upload_id, part_number
         );
-        println!("[Flicker] get_chunk_url: GET {} part={}", url, part_number);
+        crate::flog!("get_chunk_url: GET {} part={}", url, part_number);
         let resp = self
             .client
             .get(&url)
@@ -605,7 +638,7 @@ impl EmberlyCient {
             .map_err(|e| format!("Get chunk URL failed: {}", e))?;
         let status = resp.status();
         let text = resp.text().await.unwrap_or_default();
-        println!("[Flicker] get_chunk_url resp status={} body={}", status, text);
+        crate::flog!("get_chunk_url resp status={} body={}", status, text);
         if !status.is_success() {
             return Err(format!("Get chunk URL failed {}: {}", status, text));
         }
@@ -650,7 +683,6 @@ impl EmberlyCient {
         serde_json::from_value(data.clone()).map_err(|e| e.to_string())
     }
 
-    /// Delete a file from Emberly
     pub async fn delete_file(&self, token: &str, file_id: &str) -> Result<(), String> {
         let url = format!("{}/api/files/{}", self.base_url, file_id);
 
@@ -673,38 +705,6 @@ impl EmberlyCient {
         Ok(())
     }
 
-    /// Get list of user's files
-    pub async fn list_files(&self, token: &str) -> Result<Vec<UploadResponse>, String> {
-        let url = format!("{}/api/files", self.base_url);
-
-        let response = self
-            .client
-            .get(&url)
-            .header("Authorization", format!("Bearer {}", token))
-            .send()
-            .await
-            .map_err(|e| format!("List files request failed: {}", e))?;
-
-        if !response.status().is_success() {
-            return Err(format!(
-                "Failed to list files with status {}: {}",
-                response.status(),
-                response.text().await.unwrap_or_default()
-            ));
-        }
-
-        let body: serde_json::Value = response
-            .json()
-            .await
-            .map_err(|e| format!("Failed to parse response: {}", e))?;
-
-        let data = body.get("data").ok_or("Missing 'data' in response")?;
-
-        serde_json::from_value(data.clone())
-            .map_err(|e| format!("Failed to parse files list: {}", e))
-    }
-
-    /// Get user upload/usage statistics
     pub async fn get_stats(&self, token: &str) -> Result<AnalyticsSummary, String> {
         let url = format!("{}/api/analytics/summary", self.base_url);
 

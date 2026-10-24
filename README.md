@@ -34,9 +34,24 @@ Download the latest release for your platform from the [Releases](https://github
 
 | Platform | Download |
 |----------|----------|
-| Windows | `flicker_x.x.x_x64-setup.exe` |
-| macOS | `flicker_x.x.x_x64.dmg` |
-| Linux | `flicker_x.x.x_amd64.deb` |
+| Windows | `Flicker_x.x.x_x64-setup.exe` |
+| macOS (Apple silicon: M1 and later) | `Flicker_x.x.x_aarch64.dmg` |
+| macOS (Intel) | `Flicker_x.x.x_x64.dmg` |
+| Linux | `Flicker_x.x.x_amd64.deb` or `.AppImage` |
+
+#### First launch on macOS
+
+Flicker isn't signed with an Apple Developer certificate yet, so macOS may say
+it "is damaged and can't be opened" or "can't be checked for malicious
+software". After moving Flicker to Applications, run this once in Terminal:
+
+```bash
+xattr -cr /Applications/Flicker.app
+```
+
+Then open Flicker and grant **Screen Recording** (and **Accessibility**, for
+shortcuts) when asked. macOS only applies Screen Recording after Flicker
+restarts.
 
 ### Build from Source
 
@@ -67,20 +82,32 @@ bun run tauri:build
 # or: npm run tauri:build
 ```
 
-### Distribution / Cross-Platform Builds
+### Releasing
 
-Tauri apps embed the OS's native webview and produce OS-native installers, so a
-Windows machine cannot produce a macOS `.dmg` or a Linux AppImage/`.deb`/`.rpm` —
-each platform must be built natively. `.github/workflows/release.yml` handles
-this with a GitHub Actions matrix (`windows-latest`, `macos-latest` for both
-Apple Silicon and Intel, `ubuntu-22.04`) that builds and drafts a GitHub Release
-whenever a `flicker-v*` tag is pushed, or on demand via workflow dispatch.
+Each platform has to be built on that platform, so releases are built by GitHub
+Actions:
 
-Code signing and notarization (required for a smooth install experience on
-Windows and macOS) and updater-artifact signing are not yet configured — the
-workflow will still produce unsigned installers without them. See
-[Tauri's distribution docs](https://v2.tauri.app/distribute/) for setting up
-signing when ready.
+- **`ci.yml`** typechecks the frontend and compiles the backend on Windows,
+  macOS and Linux for every push to `master`/`dev` and every pull request.
+- **`release.yml`** builds installers for Windows, macOS (Apple Silicon and
+  Intel) and Linux and attaches them, with their update signatures and
+  `latest.json`, to a GitHub release.
+
+To release:
+
+1. Bump the version in `package.json`, `src-tauri/tauri.conf.json`,
+   `src-tauri/Cargo.toml` and `src/constants.ts`, and add a section to
+   `CHANGELOG.md`. The workflow refuses to build if these don't match.
+2. Either **publish a release** on GitHub with a tag like `v0.4.0`, and the
+   builds are attached to it; or **run the Release workflow by hand**, which
+   creates a draft release with notes from the changelog for you to review and
+   publish.
+
+Updates are signed with the key in the `TAURI_SIGNING_PRIVATE_KEY` and
+`TAURI_SIGNING_PRIVATE_KEY_PASSWORD` repository secrets, and verified by the
+app against `plugins.updater.pubkey` in `tauri.conf.json`. Installed copies
+update themselves from the latest release. Windows and macOS code signing
+(which removes the "unknown publisher" warnings) isn't set up yet.
 
 ## Quick Start
 
@@ -96,13 +123,13 @@ signing when ready.
 | Fullscreen Screenshot | `Ctrl + Shift + S` |
 | All Monitors Screenshot | `Ctrl + Shift + A` |
 | Upload from Clipboard | `Ctrl + Alt + U` |
-| Region Screenshot | Not yet implemented |
+| Region Screenshot | `Ctrl + Shift + X` |
 
 All hotkeys can be customized in Settings → Hotkeys.
 
 ## Themes
 
-Flicker includes a set of built-in dark color themes (Stranger Things, Emberly Classic, Dracula, Tokyo Night, Nord, Rose Pine, Catppuccin, Cyberpunk Neon, Vaporwave, Dark Matrix, Aurora Borealis, Sunset, Ocean Deep, and seasonal variants), selectable from Settings → Preferences.
+Flicker includes a set of built-in dark color themes (Ember, the default, plus Stranger Things, Emberly Classic, Dracula, Tokyo Night, Nord, Rose Pine, Catppuccin, Cyberpunk Neon, Vaporwave, Dark Matrix, Aurora Borealis, Sunset, Ocean Deep, and seasonal variants), selectable from Settings → Preferences.
 
 ## Configuration
 

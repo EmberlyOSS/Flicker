@@ -1,9 +1,3 @@
-/**
- * Flicker Color System - Based on the main website theme system
- * Uses HSL format: "hue saturation% lightness%"
- * All colors are CSS variables that get injected into :root
- */
-
 export interface ColorConfig {
   background: string
   foreground: string
@@ -26,9 +20,6 @@ export interface ColorConfig {
   ring: string
 }
 
-/**
- * Stranger Things Theme - Purple/Red/Cyan neon (DEFAULT)
- */
 export const STRANGER_THINGS_THEME: ColorConfig = {
   background: '232 36% 6%',
   foreground: '210 40% 96%',
@@ -51,13 +42,31 @@ export const STRANGER_THINGS_THEME: ColorConfig = {
   ring: '197 100% 60%',
 }
 
-// Default colors are now the Stranger Things theme
-export const DEFAULT_COLORS: ColorConfig = STRANGER_THINGS_THEME
+export const EMBER_THEME: ColorConfig = {
+  background: '20 14% 4%',
+  foreground: '30 20% 96%',
+  card: '20 12% 6.5%',
+  cardForeground: '30 20% 96%',
+  popover: '20 12% 7%',
+  popoverForeground: '30 20% 96%',
+  primary: '24.6 95% 53.1%',
+  primaryForeground: '20 30% 8%',
+  secondary: '20 10% 13%',
+  secondaryForeground: '30 20% 96%',
+  muted: '20 10% 13%',
+  mutedForeground: '25 8% 64%',
+  accent: '20 10% 14%',
+  accentForeground: '30 20% 96%',
+  destructive: '0 72% 51%',
+  destructiveForeground: '0 0% 98%',
+  border: '20 9% 15%',
+  input: '20 9% 17%',
+  ring: '24.6 95% 53.1%',
+}
 
-/**
- * Emberly Classic Dark Theme
- * Dark midnight blue base with bright foregrounds
- */
+export const DEFAULT_THEME_NAME = 'Ember'
+export const DEFAULT_COLORS: ColorConfig = EMBER_THEME
+
 export const EMBERLY_CLASSIC_THEME: ColorConfig = {
   background: '222.2 84% 4.9%',
   foreground: '210 40% 98%',
@@ -80,9 +89,6 @@ export const EMBERLY_CLASSIC_THEME: ColorConfig = {
   ring: '212.7 26.8% 83.9%',
 }
 
-/**
- * Christmas Theme - Red/Green/Gold
- */
 export const CHRISTMAS_THEME: ColorConfig = {
   background: '140 40% 6%',
   foreground: '210 40% 98%',
@@ -105,9 +111,6 @@ export const CHRISTMAS_THEME: ColorConfig = {
   ring: '45 90% 60%',
 }
 
-/**
- * Pride Theme - Rainbow colors
- */
 export const PRIDE_THEME: ColorConfig = {
   background: '220 18% 10%',
   foreground: '210 40% 98%',
@@ -130,9 +133,6 @@ export const PRIDE_THEME: ColorConfig = {
   ring: '300 82% 60%',
 }
 
-/**
- * Aurora Borealis Theme - Cyan/Green/Purple
- */
 export const AURORA_BOREALIS_THEME: ColorConfig = {
   background: '240 40% 6%',
   foreground: '210 40% 98%',
@@ -155,9 +155,6 @@ export const AURORA_BOREALIS_THEME: ColorConfig = {
   ring: '180 100% 55%',
 }
 
-/**
- * Cyberpunk Neon Theme - Cyan/Magenta
- */
 export const CYBERPUNK_NEON_THEME: ColorConfig = {
   background: '270 20% 5%',
   foreground: '210 40% 98%',
@@ -180,9 +177,6 @@ export const CYBERPUNK_NEON_THEME: ColorConfig = {
   ring: '180 100% 60%',
 }
 
-/**
- * Dark Matrix Theme - Green code theme
- */
 export const DARK_MATRIX_THEME: ColorConfig = {
   background: '120 40% 5%',
   foreground: '120 100% 90%',
@@ -205,9 +199,6 @@ export const DARK_MATRIX_THEME: ColorConfig = {
   ring: '120 100% 60%',
 }
 
-/**
- * Vaporwave Theme - Purple/Pink/Cyan
- */
 export const VAPORWAVE_THEME: ColorConfig = {
   background: '300 40% 8%',
   foreground: '210 40% 98%',
@@ -230,9 +221,6 @@ export const VAPORWAVE_THEME: ColorConfig = {
   ring: '280 100% 60%',
 }
 
-/**
- * Dracula Theme - Purple/Pink/Green
- */
 export const DRACULA_THEME: ColorConfig = {
   background: '231 15% 18%',
   foreground: '60 30% 96%',
@@ -255,9 +243,6 @@ export const DRACULA_THEME: ColorConfig = {
   ring: '265 89% 78%',
 }
 
-/**
- * Tokyo Night Theme - Deep blue with purple accents
- */
 export const TOKYO_NIGHT_THEME: ColorConfig = {
   background: '235 21% 13%',
   foreground: '220 13% 91%',
@@ -280,9 +265,6 @@ export const TOKYO_NIGHT_THEME: ColorConfig = {
   ring: '252 87% 67%',
 }
 
-/**
- * Nord Theme - Arctic, bluish-gray
- */
 export const NORD_THEME: ColorConfig = {
   background: '220 16% 22%',
   foreground: '218 27% 92%',
@@ -305,9 +287,6 @@ export const NORD_THEME: ColorConfig = {
   ring: '193 43% 67%',
 }
 
-/**
- * Sunset Theme - Orange/Pink/Purple gradient feel
- */
 export const SUNSET_THEME: ColorConfig = {
   background: '260 30% 8%',
   foreground: '30 100% 96%',
@@ -330,9 +309,6 @@ export const SUNSET_THEME: ColorConfig = {
   ring: '25 95% 60%',
 }
 
-/**
- * Ocean Deep Theme - Deep sea blues and teals
- */
 export const OCEAN_DEEP_THEME: ColorConfig = {
   background: '200 50% 6%',
   foreground: '185 30% 94%',
@@ -355,9 +331,6 @@ export const OCEAN_DEEP_THEME: ColorConfig = {
   ring: '185 80% 50%',
 }
 
-/**
- * Rose Pine Theme - Soft, warm rose colors
- */
 export const ROSE_PINE_THEME: ColorConfig = {
   background: '249 22% 12%',
   foreground: '245 50% 91%',
@@ -380,9 +353,6 @@ export const ROSE_PINE_THEME: ColorConfig = {
   ring: '330 59% 69%',
 }
 
-/**
- * Catppuccin Mocha Theme - Warm pastel colors
- */
 export const CATPPUCCIN_MOCHA_THEME: ColorConfig = {
   background: '240 21% 15%',
   foreground: '226 64% 88%',
@@ -405,10 +375,8 @@ export const CATPPUCCIN_MOCHA_THEME: ColorConfig = {
   ring: '267 84% 81%',
 }
 
-/**
- * Theme presets for easy switching
- */
 export const THEME_PRESETS = [
+  { name: 'Ember', colors: EMBER_THEME, description: 'The Emberly look' },
   { name: 'Stranger Things', colors: STRANGER_THINGS_THEME, description: 'Red neon - Hawkins vibes' },
   { name: 'Emberly Classic', colors: EMBERLY_CLASSIC_THEME, description: 'Original midnight blue' },
   { name: 'Dracula', colors: DRACULA_THEME, description: 'Classic purple vampire' },
@@ -426,10 +394,6 @@ export const THEME_PRESETS = [
   { name: 'Pride', colors: PRIDE_THEME, description: 'Rainbow colors' },
 ]
 
-/**
- * Convert HSL to Hex color
- * Used for color picker compatibility
- */
 export function hslToHex(h: number, s: number, l: number): string {
   l = l / 100
   const a = (s * Math.min(l, 1 - l)) / 100
@@ -443,10 +407,6 @@ export function hslToHex(h: number, s: number, l: number): string {
   return `#${f(0)}${f(8)}${f(4)}`.toUpperCase()
 }
 
-/**
- * Convert Hex to HSL string
- * Used for color picker compatibility
- */
 export function hexToHSL(hex: string): string {
   const parts = hex.replace(/^#/, '').split('')
   if (parts.length === 6) {

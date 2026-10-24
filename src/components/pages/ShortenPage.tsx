@@ -1,36 +1,90 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { writeText } from '@tauri-apps/plugin-clipboard-manager'
-import { Link2, Copy, Check, Loader2, AlertCircle } from 'lucide-react'
+import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager'
+import { openUrl } from '@tauri-apps/plugin-opener'
+import { Link2, Copy, Check, Loader2, AlertCircle, ExternalLink, History, ArrowRight } from 'lucide-react'
 import { ShortenedUrlResponse } from '../../types'
 import { API_URL } from '../../constants'
+import { playSound } from '../../utils/sounds'
+import { EmptyState, Section, timeAgo } from '../ui/kit'
 
 interface ShortenPageProps {
   uploadToken: string
   uploadUrl?: string
 }
 
+interface ShortLink {
+  shortUrl: string
+  targetUrl: string
+  createdAt: number
+}
+
+const STORAGE_KEY = 'flicker_short_links'
+const isUrl = (value: string) => /^https?:\/\/\S+\.\S+/i.test(value.trim())
+
+function loadLinks(): ShortLink[] {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
+  } catch {
+    return []
+  }
+}
+
+async function copy(text: string) {
+  try {
+    await writeText(text)
+  } catch {
+    navigator.clipboard.writeText(text)
+  }
+  playSound('copyLink')
+}
+
 export function ShortenPage({ uploadToken, uploadUrl }: ShortenPageProps) {
   const [url, setUrl] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [result, setResult] = useState<ShortenedUrlResponse | null>(null)
-  const [copied, setCopied] = useState(false)
+  const [links, setLinks] = useState<ShortLink[]>(loadLinks)
+  const [copied, setCopied] = useState<string | null>(null)
+
+  useEffect(() => {
+    readText()
+      .then(text => {
+        if (text && isUrl(text) && !text.includes('/u/')) setUrl(text.trim())
+      })
+      .catch(() => {})
+  }, [])
+
+  const handleCopy = async (shortUrl: string) => {
+    await copy(shortUrl)
+    setCopied(shortUrl)
+    setTimeout(() => setCopied(c => (c === shortUrl ? null : c)), 2000)
+  }
 
   const handleShorten = async () => {
-    if (!url.trim() || !uploadToken) return
-
+    const target = url.trim()
+    if (!target || !uploadToken) return
+    if (!isUrl(target)) {
+      setError('Enter a full link, starting with http:// or https://')
+      return
+    }
     setLoading(true)
     setError(null)
-    setResult(null)
-
     try {
       const response = await invoke<ShortenedUrlResponse>('emberly_shorten_url', {
         apiUrl: uploadUrl || API_URL,
         token: uploadToken,
-        url: url.trim(),
+        url: target,
       })
-      setResult(response)
+      const link = {
+        shortUrl: `${(uploadUrl || API_URL).replace(/\/+$/, '')}/u/${response.shortCode}`,
+        targetUrl: target,
+        createdAt: Date.now(),
+      }
+      const next = [link, ...links.filter(l => l.shortUrl !== link.shortUrl)].slice(0, 20)
+      setLinks(next)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+      setUrl('')
+      await handleCopy(link.shortUrl)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -38,99 +92,93 @@ export function ShortenPage({ uploadToken, uploadUrl }: ShortenPageProps) {
     }
   }
 
-  const shortUrl = result ? `${uploadUrl || API_URL}/${result.shortCode}` : ''
-
-  const handleCopy = async () => {
-    if (!shortUrl) return
-    try {
-      await writeText(shortUrl)
-    } catch {
-      navigator.clipboard.writeText(shortUrl)
-    }
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
+  const latest = links[0]
 
   return (
     <div className="space-y-4">
-      <div className="glass-card p-6 space-y-4">
-        <div className="flex flex-col items-center gap-4 text-center">
-          <div className="p-4 rounded-2xl bg-secondary/50">
-            <Link2 size={32} className="text-muted-foreground" />
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold text-foreground">Shorten a URL</h3>
-            <p className="text-sm text-muted-foreground">Paste a long link to get a short one</p>
-          </div>
-        </div>
-
-        <div className="flex gap-2">
+      <Section icon={Link2} title="Shorten a link" description="The short link is copied as soon as it's ready">
+        <form
+          className="flex gap-2"
+          onSubmit={e => {
+            e.preventDefault()
+            handleShorten()
+          }}
+        >
           <input
             type="text"
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleShorten()}
-            placeholder="https://example.com/very/long/url"
-            className="flex-1 px-4 py-2.5 bg-secondary/50 border border-border/50 rounded-xl text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+            onChange={e => setUrl(e.target.value)}
+            placeholder="https://example.com/a/very/long/link"
+            autoFocus
+            className="min-w-0 flex-1 rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder-muted-foreground transition-colors focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
           />
           <button
-            onClick={handleShorten}
-            disabled={loading || !url.trim() || !uploadToken}
-            className="btn-primary px-6 py-2.5 flex items-center gap-2 disabled:opacity-50"
+            type="submit"
+            disabled={loading || !url.trim()}
+            className="flex items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
           >
-            {loading ? <Loader2 size={18} className="animate-spin" /> : 'Shorten'}
+            {loading ? <Loader2 size={15} className="animate-spin" /> : <ArrowRight size={15} />}
+            Shorten
           </button>
-        </div>
-      </div>
+        </form>
 
-      {error && (
-        <div className="glass-card border-l-4 border-l-destructive p-4 animate-slide-up flex items-start gap-3">
-          <AlertCircle className="text-destructive flex-shrink-0 mt-0.5" size={20} />
-          <div>
-            <p className="font-semibold text-destructive">Couldn't shorten that URL</p>
-            <p className="text-sm text-muted-foreground">{error}</p>
+        {error && (
+          <div className="mt-3 flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+            <AlertCircle size={15} className="shrink-0" />
+            {error}
           </div>
-        </div>
-      )}
+        )}
 
-      {result && (
-        <div className="glass-card border-l-4 border-l-primary p-4 animate-slide-up glow-primary-subtle space-y-3">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-primary/20">
-              <Check size={16} className="text-primary" />
-            </div>
-            <p className="font-semibold text-foreground">Shortened!</p>
-          </div>
-          <div className="flex gap-2">
-            <div className="flex-1 flex items-center gap-2 px-3 py-2.5 bg-background/50 rounded-lg border border-border">
-              <Link2 size={16} className="text-muted-foreground flex-shrink-0" />
-              <input
-                type="text"
-                value={shortUrl}
-                readOnly
-                className="flex-1 bg-transparent text-sm font-mono text-foreground focus:outline-none truncate"
-              />
+        {latest && Date.now() - latest.createdAt < 60_000 && (
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
+            <div className="min-w-0">
+              <p className="truncate font-mono text-sm text-foreground">{latest.shortUrl}</p>
+              <p className="truncate text-xs text-muted-foreground">→ {latest.targetUrl}</p>
             </div>
             <button
-              onClick={handleCopy}
-              className={`btn-secondary px-4 py-2.5 flex items-center gap-2 whitespace-nowrap transition-all ${
-                copied ? 'bg-primary/20 border-primary text-primary' : ''
-              }`}
+              onClick={() => handleCopy(latest.shortUrl)}
+              className="flex shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
             >
-              {copied ? (
-                <>
-                  <Check size={16} />
-                  Copied!
-                </>
-              ) : (
-                <>
-                  <Copy size={16} />
-                  Copy
-                </>
-              )}
+              {copied === latest.shortUrl ? <Check size={13} /> : <Copy size={13} />}
+              {copied === latest.shortUrl ? 'Copied' : 'Copy'}
             </button>
           </div>
-        </div>
+        )}
+      </Section>
+
+      {links.length > 0 ? (
+        <Section icon={History} title="Recent links" description="Links you've shortened in Flicker">
+          <div className="divide-y divide-border/60">
+            {links.map(link => (
+              <div key={link.shortUrl} className="group flex items-center justify-between gap-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="truncate font-mono text-sm text-foreground">{link.shortUrl.replace(/^https?:\/\//, '')}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {link.targetUrl} · {timeAgo(link.createdAt)}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    onClick={() => openUrl(link.shortUrl).catch(() => {})}
+                    title="Open"
+                    className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  >
+                    <ExternalLink size={14} />
+                  </button>
+                  <button
+                    onClick={() => handleCopy(link.shortUrl)}
+                    title="Copy"
+                    className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  >
+                    {copied === link.shortUrl ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Section>
+      ) : (
+        <EmptyState icon={Link2} title="No short links yet" description="Links you shorten here will show up for quick copying." />
       )}
     </div>
   )

@@ -1,60 +1,91 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'flicker-v*'
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.event.release.tag_name || github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  # Create (or reuse) a single draft release first. Matrix build jobs below
-  # upload into this release by id instead of each trying to create their
-  # own - running them all in parallel without this step causes GitHub
-  # Actions to race and create duplicate draft releases.
-  create-release:
+  prepare:
     runs-on: ubuntu-latest
     outputs:
-      release_id: ${{ steps.release.outputs.result }}
-      tag_name: ${{ steps.version.outputs.tag }}
+      release_id: ${{ steps.release.outputs.id }}
+      skip: ${{ steps.release.outputs.skip }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Read version
+      - name: Check versions match
         id: version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
         run: |
           VERSION=$(jq -r .version src-tauri/tauri.conf.json)
-          echo "tag=flicker-v$VERSION" >> "$GITHUB_OUTPUT"
+          fail() { echo "::error::$1"; exit 1; }
+          [ "$(jq -r .version package.json)" = "$VERSION" ] || fail "package.json is $(jq -r .version package.json) but tauri.conf.json is $VERSION"
+          CARGO=$(grep -m1 '^version' src-tauri/Cargo.toml | cut -d'"' -f2)
+          [ "$CARGO" = "$VERSION" ] || fail "src-tauri/Cargo.toml is $CARGO but tauri.conf.json is $VERSION"
+          grep -q "APP_VERSION = '$VERSION'" src/constants.ts || fail "APP_VERSION in src/constants.ts doesn't match $VERSION"
+          if [ -n "$TAG" ] && [ "${TAG##*v}" != "$VERSION" ]; then fail "Release tag $TAG doesn't match version $VERSION"; fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Create or reuse draft release
+      - name: Release notes from CHANGELOG
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          awk -v v="$VERSION" '
+            index($0, "## [" v "]") == 1 { found = 1; next }
+            found && /^## \[/ { exit }
+            found && /^---$/ { exit }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "See CHANGELOG.md for details." > notes.md
+
+      - name: Find or create release
         id: release
         uses: actions/github-script@v7
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         with:
           script: |
-            const tag = '${{ steps.version.outputs.tag }}';
-            const version = '${{ steps.version.outputs.version }}';
-            const { owner, repo } = context.repo;
-            try {
-              const { data } = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
-              return data.id;
-            } catch (error) {
-              if (error.status !== 404) throw error;
-              const { data } = await github.rest.repos.createRelease({
-                owner,
-                repo,
-                tag_name: tag,
-                name: `Flicker v${version}`,
-                draft: true,
-                prerelease: false,
-              });
-              return data.id;
+            const fs = require('fs')
+            const { owner, repo } = context.repo
+            const version = process.env.VERSION
+
+            let release = context.payload.release
+            if (!release) {
+              const tag = `v${version}`
+              try {
+                release = (await github.rest.repos.getReleaseByTag({ owner, repo, tag })).data
+              } catch (error) {
+                if (error.status !== 404) throw error
+                release = (await github.rest.repos.createRelease({
+                  owner,
+                  repo,
+                  tag_name: tag,
+                  target_commitish: context.sha,
+                  name: `Flicker v${version}`,
+                  body: fs.readFileSync('notes.md', 'utf8'),
+                  draft: true,
+                })).data
+              }
             }
 
+            const assets = await github.rest.repos.listReleaseAssets({ owner, repo, release_id: release.id })
+            const built = assets.data.some(a => a.name === 'latest.json')
+            if (built) core.notice(`Release ${release.tag_name} already has build files; skipping.`)
+            core.setOutput('id', release.id)
+            core.setOutput('skip', built ? 'true' : 'false')
+
   build:
-    needs: create-release
+    needs: prepare
+    if: needs.prepare.outputs.skip != 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -77,12 +108,7 @@ jobs:
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            xdg-utils
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xdg-utils
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -98,16 +124,14 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
       - name: Install frontend dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
 
       - name: Build and upload
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Only needed once updater signing is configured (see README's
-          # Distribution section) - safe to leave unset until then.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          releaseId: ${{ needs.create-release.outputs.release_id }}
+          releaseId: ${{ needs.prepare.outputs.release_id }}
           args: ${{ matrix.args }}

@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { AppNotification, AddNotificationParams } from '../types'
+import { playSound } from '../utils/sounds'
 
-// Check if we're in a Tauri environment
 function isTauri(): boolean {
   return typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__
 }
@@ -142,6 +142,7 @@ export function useNotifications() {
   }, [addNotification])
 
   const notifyError = useCallback((title: string, message: string) => {
+    playSound('uploadError')
     return addNotification({ priority: 'important', category: 'error', title, message, persistent: true })
   }, [addNotification])
 
@@ -169,7 +170,6 @@ export function useNotifications() {
     })
   }, [addNotification])
 
-  // Initial load
   useEffect(() => {
     const init = async () => {
       if (!isTauri()) {

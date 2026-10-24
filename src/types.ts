@@ -6,14 +6,13 @@ export interface AppConfig {
   preferredDomain?: string
   autoUpload: boolean
   defaultNotification: boolean
-  // User data from login
+
   user?: AuthenticatedUser
-  // Hotkey settings
+
   hotkeys?: HotkeyConfig
-  // Screenshot settings
+
   screenshotMode?: ScreenshotMode
 
-  // -- NEW CUSTOMIZATION --
   appearance?: AppearanceConfig
   behavior?: BehaviorConfig
   capture?: CaptureConfig
@@ -21,8 +20,8 @@ export interface AppConfig {
 }
 
 export interface AppearanceConfig {
-  theme: string // 'dark', 'light', 'midnight', etc.
-  backgroundOpacity: number // 0.5 to 1.0
+  theme: string
+  backgroundOpacity: number
   fontScale: 'small' | 'medium' | 'large'
   fontFamily: 'system' | 'inter' | 'roboto' | 'mono' | 'poppins'
   borderRadius: 'none' | 'small' | 'medium' | 'large'
@@ -45,41 +44,42 @@ export interface BehaviorConfig {
   clipboardFormat: ClipboardFormat
   playSound: boolean
   startAtLogin: boolean
+  closeAction?: 'tray' | 'minimize' | 'quit'
 }
 
 export interface CaptureConfig {
   format: 'png' | 'jpg'
-  quality: number // 1-100 (for jpg)
-  delay: number // seconds
-  filenamePattern: string // e.g. "Screen_{date}_{time}"
+  quality: number
+  delay: number
+  filenamePattern: string
   saveLocally: boolean
   includeCursor: boolean
 }
 
 export interface VideoConfig {
-  includeSystemAudio: boolean // default true
-  includeMic: boolean // default false
+  includeSystemAudio: boolean
+  includeMic: boolean
   showClicks: boolean
-  fps: number // 30
-  maxDurationSecs: number // 600 (10m)
+  fps: number
+  maxDurationSecs: number
   autoUpload: boolean
 }
 
 export type ScreenshotMode = 'primary' | 'active' | 'all'
 
 export interface HotkeyConfig {
-  screenshotFullscreen: string // e.g., "Ctrl+Alt+PrintScreen"
-  screenshotRegion: string // e.g., "Ctrl+Shift+PrintScreen"
-  screenshotAllMonitors: string // e.g., "Ctrl+Shift+A"
-  uploadClipboard: string // e.g., "Ctrl+Alt+U"
-  openApp: string // e.g., "Ctrl+Alt+E"
-  recordVideo: string // e.g., Super+Shift+R
+  screenshotFullscreen: string
+  screenshotRegion: string
+  screenshotAllMonitors: string
+  uploadClipboard: string
+  openApp: string
+  recordVideo: string
 }
 
 export interface AuthenticatedUser {
   id: string
   name: string | null
-  email: string
+  email: string | null
   image: string | null
   urlId: string
 }
@@ -95,7 +95,7 @@ export interface LoginResponse {
   user?: {
     id: string
     name: string | null
-    email: string
+    email: string | null
     uploadToken: string
     image: string | null
     urlId: string
@@ -108,14 +108,14 @@ export interface UploadResponse {
   id?: string
   url: string
   name: string
-  size: number // Size in bytes
-  type: string // MIME type
+  size: number
+  type: string
 }
 
 export interface UserProfile {
   id: string
   name: string | null
-  email: string
+  email: string | null
   image: string | null
   urlId: string
 }
@@ -242,10 +242,6 @@ export interface UploadHistoryItem {
   thumbnailUrl?: string
   fileId?: string
 }
-
-// ============================================================================
-// Notification Types
-// ============================================================================
 
 export type NotificationPriority = 'system' | 'important' | 'default' | 'transient'
 export type NotificationCategory = 'admin' | 'security' | 'account' | 'update' | 'upload' | 'error' | 'info' | 'success'

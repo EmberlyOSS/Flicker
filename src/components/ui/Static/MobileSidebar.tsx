@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Menu, X, Camera, Zap } from 'lucide-react';
-import { NavItem } from './Sidebar';
+import { Menu, X, Camera, Settings, LogOut } from 'lucide-react';
+import { NavItem, navItemClass } from './Sidebar';
 import { Logo } from '../Logo';
 import { APP_VERSION } from '../../../constants';
 import '../../../styles/MobileSidebar.css';
@@ -44,133 +44,95 @@ export function MobileSidebar({
 
   return (
     <>
-      {/* Mobile Header */}
-      <header className="mobile-header glass-elevated border-b border-border/40 rounded-none relative z-30 sticky top-0">
+      <header className="mobile-header sticky top-0 z-30 border-b border-border/70 bg-card/75 backdrop-blur-xl">
         <div className="flex items-center justify-between px-4 py-3">
-          {/* Logo and branding */}
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center border border-primary/40 shadow-lg shadow-primary/10">
-              <Logo size={22} primaryColor="#ffffff" accentColor="hsl(var(--primary))" />
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
+              <Logo size={22} />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <h1 className="font-bold text-foreground text-sm">Flicker</h1>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary font-medium">
-                  {APP_VERSION}
+                <h1 className="text-sm font-semibold tracking-tight text-foreground">Flicker</h1>
+                <span className="rounded-md border border-primary/30 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                  v{APP_VERSION}
                 </span>
               </div>
-              {username ? (
-                <p className="text-xs text-muted-foreground truncate">{username}</p>
-              ) : (
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Zap size={10} className="text-primary" />
-                  Screenshot & Upload
-                </p>
-              )}
+              <p className="truncate text-xs text-muted-foreground">{username || 'Screenshot & upload'}</p>
             </div>
           </div>
 
-          {/* Actions */}
           <div className="flex items-center gap-2">
-            {/* Upload count badge when logged in */}
             {isLoggedIn && uploadCount > 0 && (
               <button
                 onClick={() => onNavChange('history')}
-                className="px-2 py-1 rounded-lg bg-secondary/50 border border-border/50 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                className="rounded-lg border border-border/70 bg-secondary/50 px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
               >
                 {uploadCount} upload{uploadCount !== 1 ? 's' : ''}
               </button>
             )}
-            {/* Screenshot button in header */}
             {isLoggedIn && onScreenshot && (
               <button
                 onClick={onScreenshot}
-                className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/25 border border-primary/20 hover:shadow-primary/40 hover:scale-105 active:scale-95 transition-all duration-200"
-                aria-label="Take Screenshot"
+                className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
+                aria-label="Take screenshot"
               >
-                <Camera size={20} className="drop-shadow-sm" />
+                <Camera size={18} />
               </button>
             )}
-            {/* Sign In button if not logged in */}
             {!isLoggedIn && onLogin && (
               <button
                 onClick={onLogin}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors shadow-md shadow-primary/20"
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
               >
                 Sign In
               </button>
             )}
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="p-2 hover:bg-secondary/50 rounded-lg transition-colors"
+              className="rounded-lg p-2 transition-colors hover:bg-secondary/60"
               aria-label="Toggle menu"
             >
-              {isOpen ? <X size={22} className="text-foreground" /> : <Menu size={22} className="text-muted-foreground" />}
+              {isOpen ? <X size={20} className="text-foreground" /> : <Menu size={20} className="text-muted-foreground" />}
             </button>
           </div>
         </div>
       </header>
 
-      {/* Mobile Menu Overlay */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setIsOpen(false)}
-        />
-      )}
+      {isOpen && <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setIsOpen(false)} />}
 
-      {/* Mobile Menu */}
       <nav
-        className={`mobile-menu glass-elevated border-b border-border/40 rounded-none fixed left-0 right-0 top-[60px] z-50 lg:hidden overflow-y-auto transition-all duration-300 ${
-          isOpen ? 'max-h-[80vh] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
+        className={`mobile-menu fixed left-0 right-0 top-[60px] z-50 overflow-y-auto border-b border-border/70 bg-card/95 backdrop-blur-xl transition-all duration-300 lg:hidden ${
+          isOpen ? 'max-h-[80vh] opacity-100' : 'max-h-0 overflow-hidden opacity-0'
         }`}
       >
-        <div className="p-2 space-y-1">
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => handleNavClick(item.id)}
-              className={`w-full px-4 py-3 rounded-lg flex items-center gap-3 transition-all duration-200 font-medium text-sm ${
-                activeNav === item.id
-                  ? 'bg-primary text-primary-foreground shadow-md'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
-              }`}
-            >
-              <span className="flex-shrink-0">{item.icon}</span>
-              <span className="flex-1 text-left">{item.label}</span>
-              {item.badge !== undefined && (
-                <span
-                  className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${
-                    activeNav === item.id
-                      ? 'bg-primary-foreground/20 text-primary-foreground'
-                      : 'bg-primary/20 text-primary'
-                  }`}
-                >
-                  {item.badge}
-                </span>
-              )}
-            </button>
-          ))}
+        <div className="space-y-0.5 p-2">
+          {navItems.map((item) => {
+            const active = activeNav === item.id;
+            return (
+              <button key={item.id} onClick={() => handleNavClick(item.id)} className={navItemClass(active)}>
+                <span className={`shrink-0 ${active ? 'text-primary' : ''}`}>{item.icon}</span>
+                <span className="flex-1 text-left">{item.label}</span>
+                {item.badge !== undefined && (
+                  <span className="shrink-0 rounded-md bg-secondary px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground">
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
 
-          <div className="border-t border-border/30 my-2 pt-2">
-            <button
-              onClick={() => handleNavClick('settings')}
-              className={`w-full px-4 py-3 rounded-lg flex items-center gap-3 transition-all duration-200 font-medium text-sm ${
-                activeNav === 'settings'
-                  ? 'bg-primary text-primary-foreground shadow-md'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
-              }`}
-            >
-              <span className="text-lg">⚙️</span>
+          <div className="mt-2 space-y-0.5 border-t border-border/60 pt-2">
+            <button onClick={() => handleNavClick('settings')} className={navItemClass(activeNav === 'settings')}>
+              <Settings size={16} className={activeNav === 'settings' ? 'text-primary' : ''} />
               <span className="flex-1 text-left">Settings</span>
             </button>
 
             {showLogout && (
               <button
                 onClick={handleLogout}
-                className="w-full px-4 py-3 rounded-lg flex items-center gap-3 transition-all duration-200 font-medium text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                className="w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
               >
-                <span className="text-lg">🚪</span>
+                <LogOut size={16} />
                 <span className="flex-1 text-left">Sign Out</span>
               </button>
             )}

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
+import { playSound } from '../../utils/sounds'
 import { ClipboardFormat, UploadHistoryItem } from '../../types'
 import { formatForClipboard } from '../../utils/clipboardFormat'
 import { API_URL } from '../../constants'
@@ -26,22 +27,24 @@ async function copyToClipboard(text: string): Promise<void> {
   } catch {
     navigator.clipboard.writeText(text)
   }
+  playSound('copyLink')
 }
 
 const ITEMS_PER_PAGE = 12
 
 type SortOption = 'newest' | 'oldest' | 'name-asc' | 'name-desc' | 'size-asc' | 'size-desc'
 
-// Helper to get preview URL with /raw endpoint
 function getPreviewUrl(url: string): string {
-  return url.endsWith('/raw') ? url : `${url}/raw`
+  const base = url.replace(/\/+$/, '')
+  return base.endsWith('/raw') ? base : `${base}/raw`
 }
 
-// Helper to determine file type category
 function getFileCategory(item: UploadHistoryItem): 'image' | 'video' | 'audio' | 'document' | 'other' {
   const type = item.fileType?.toLowerCase() || ''
-  const url = item.url.toLowerCase()
-  
+  const url = /\.[a-z0-9]+$/i.test(item.name) ? item.name.toLowerCase() : item.url.replace(/\/+$/, '').toLowerCase()
+
+  if (item.thumbnailUrl) return 'image'
+
   if (type.startsWith('image/') || /\.(png|jpg|jpeg|gif|webp|bmp|svg)$/i.test(url)) return 'image'
   if (type.startsWith('video/') || /\.(mp4|webm|mov|avi|mkv)$/i.test(url)) return 'video'
   if (type.startsWith('audio/') || /\.(mp3|wav|ogg|flac|m4a)$/i.test(url)) return 'audio'
@@ -50,20 +53,18 @@ function getFileCategory(item: UploadHistoryItem): 'image' | 'video' | 'audio' |
   return 'other'
 }
 
-// Get icon based on file category
 function FileIcon({ category, size = 20 }: { category: ReturnType<typeof getFileCategory>; size?: number }) {
   const className = size === 20 ? "w-5 h-5" : `w-${size} h-${size}`
-  
+
   switch (category) {
-    case 'image': return <Image className={`${className} text-blue-400`} />
-    case 'video': return <Video className={`${className} text-purple-400`} />
-    case 'audio': return <Music className={`${className} text-green-400`} />
-    case 'document': return <FileText className={`${className} text-yellow-400`} />
+    case 'image': return <Image className={`${className} text-primary`} />
+    case 'video': return <Video className={`${className} text-primary`} />
+    case 'audio': return <Music className={`${className} text-primary`} />
+    case 'document': return <FileText className={`${className} text-primary`} />
     default: return <File className={`${className} text-muted-foreground`} />
   }
 }
 
-// Format file size
 function formatSize(bytes?: number): string {
   if (!bytes) return ''
   if (bytes < 1024) return `${bytes} B`
@@ -72,11 +73,10 @@ function formatSize(bytes?: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
 }
 
-// Format time
 function formatTime(timestamp: number): string {
   const now = Date.now()
   const diff = now - timestamp
-  
+
   if (diff < 60000) return 'Just now'
   if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`
   if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`
@@ -84,7 +84,6 @@ function formatTime(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString()
 }
 
-// Preview Modal Component
 function PreviewModal({
   item,
   onClose,
@@ -139,17 +138,17 @@ function PreviewModal({
       setUpdating(false)
     }
   }
-  
+
   return (
-    <div 
+    <div
       className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in"
       onClick={onClose}
     >
-      <div 
+      <div
         className="relative max-w-4xl w-full max-h-[90vh] glass-card overflow-hidden border border-border/50"
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
+
         <div className="flex items-center justify-between p-4 border-b border-border/50 bg-background/50">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <div className="flex-shrink-0">
@@ -176,13 +175,12 @@ function PreviewModal({
             <X className="w-5 h-5 text-muted-foreground" />
           </button>
         </div>
-        
-        {/* Content - image at exact 1:1 dimensions, scrollable if larger than viewport */}
+
         <div className="overflow-auto bg-black/30 max-h-[65vh]">
           {category === 'image' && (
             <div className="p-6 flex justify-center">
-              <img 
-                src={previewUrl} 
+              <img
+                src={previewUrl}
                 alt={item.name}
                 className="block rounded-lg shadow-2xl max-w-none max-h-none"
                 style={{ width: 'auto', height: 'auto', imageRendering: 'auto' }}
@@ -192,9 +190,9 @@ function PreviewModal({
           )}
           {category === 'video' && (
             <div className="p-6 flex justify-center">
-              <video 
-                src={previewUrl} 
-                controls 
+              <video
+                src={previewUrl}
+                controls
                 className="max-w-full rounded-lg shadow-2xl"
               />
             </div>
@@ -225,14 +223,13 @@ function PreviewModal({
           )}
         </div>
 
-        {/* File Management */}
         {canManage && (
           <div className="p-4 border-t border-border/50 space-y-3">
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setVisibility('PUBLIC')}
                 className={`flex-1 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
-                  visibility === 'PUBLIC' ? 'bg-primary text-primary-foreground' : 'bg-secondary/30 text-muted-foreground hover:bg-secondary/50'
+                  visibility === 'PUBLIC' ? 'bg-primary/10 text-primary ring-1 ring-inset ring-primary/40' : 'bg-secondary/40 text-muted-foreground hover:bg-secondary/70'
                 }`}
               >
                 <Globe className="w-3.5 h-3.5" />
@@ -241,7 +238,7 @@ function PreviewModal({
               <button
                 onClick={() => setVisibility('PRIVATE')}
                 className={`flex-1 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
-                  visibility === 'PRIVATE' ? 'bg-primary text-primary-foreground' : 'bg-secondary/30 text-muted-foreground hover:bg-secondary/50'
+                  visibility === 'PRIVATE' ? 'bg-primary/10 text-primary ring-1 ring-inset ring-primary/40' : 'bg-secondary/40 text-muted-foreground hover:bg-secondary/70'
                 }`}
               >
                 <Lock className="w-3.5 h-3.5" />
@@ -269,7 +266,6 @@ function PreviewModal({
           </div>
         )}
 
-        {/* Footer */}
         <div className="flex items-center justify-between gap-2 p-4 border-t border-border/50 bg-background/50">
           <div className="flex gap-2">
             <button
@@ -330,18 +326,17 @@ function PreviewModal({
   )
 }
 
-// Thumbnail component with loading state
 function Thumbnail({ item, onClick }: { item: UploadHistoryItem; onClick: () => void }) {
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState(false)
   const category = getFileCategory(item)
   const previewUrl = getPreviewUrl(item.thumbnailUrl || item.url)
-  
+
   if (category === 'image' && !error) {
     return (
-      <button 
+      <button
         onClick={onClick}
-        className="relative w-full aspect-video rounded-lg overflow-hidden bg-secondary/30 group border border-border/30"
+        className="relative block w-full aspect-video overflow-hidden bg-secondary/30 group"
       >
         {!loaded && (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -363,12 +358,12 @@ function Thumbnail({ item, onClick }: { item: UploadHistoryItem; onClick: () => 
       </button>
     )
   }
-  
+
   if (category === 'video') {
     return (
-      <button 
+      <button
         onClick={onClick}
-        className="relative w-full aspect-video rounded-lg overflow-hidden bg-secondary/30 group border border-border/30"
+        className="relative block w-full aspect-video overflow-hidden bg-secondary/30 group"
       >
         <video
           src={previewUrl}
@@ -384,10 +379,9 @@ function Thumbnail({ item, onClick }: { item: UploadHistoryItem; onClick: () => 
       </button>
     )
   }
-  
-  // Fallback for non-previewable files
+
   return (
-    <div className="w-full aspect-video rounded-lg bg-secondary/30 flex items-center justify-center border border-border/30">
+    <div className="w-full aspect-video bg-secondary/30 flex items-center justify-center">
       <div className="text-center space-y-2">
         <div className="w-12 h-12 mx-auto rounded-xl bg-secondary/50 flex items-center justify-center border border-border/30">
           <FileIcon category={category} size={24} />
@@ -412,25 +406,21 @@ export function UploadHistory({ history, onCopy, onDelete, clipboardFormat, uplo
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
-  // Filter and search history
   const filteredHistory = useMemo(() => {
     let filtered = history
 
-    // Apply category filter
     if (filter !== 'all') {
       filtered = filtered.filter(item => getFileCategory(item) === filter)
     }
 
-    // Apply search
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(item => 
+      filtered = filtered.filter(item =>
         item.name.toLowerCase().includes(query) ||
         item.url.toLowerCase().includes(query)
       )
     }
 
-    // Apply sorting
     const sorted = [...filtered]
     switch (sortBy) {
       case 'newest':
@@ -456,7 +446,6 @@ export function UploadHistory({ history, onCopy, onDelete, clipboardFormat, uplo
     return sorted
   }, [history, filter, searchQuery, sortBy])
 
-  // Pagination
   const totalPages = Math.ceil(filteredHistory.length / ITEMS_PER_PAGE)
   const paginatedHistory = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE
@@ -470,7 +459,6 @@ export function UploadHistory({ history, onCopy, onDelete, clipboardFormat, uplo
     onCopy?.(item.url)
   }
 
-  // Reset page when filter/search changes
   const handleFilterChange = (newFilter: typeof filter) => {
     setFilter(newFilter)
     setCurrentPage(1)
@@ -513,7 +501,6 @@ export function UploadHistory({ history, onCopy, onDelete, clipboardFormat, uplo
     setSelectMode(false)
   }
 
-  // Get count by category
   const categoryCounts = useMemo(() => {
     const counts = { all: history.length, image: 0, video: 0, audio: 0, document: 0 }
     history.forEach(item => {
@@ -525,7 +512,7 @@ export function UploadHistory({ history, onCopy, onDelete, clipboardFormat, uplo
 
   if (history.length === 0) {
     return (
-      <div className="glass-card p-12 text-center border border-border/30">
+      <div className="glass-card p-12 text-center">
         <div className="flex justify-center mb-4">
           <div className="p-4 bg-secondary/50 rounded-2xl border border-border/30">
             <History className="text-muted-foreground w-10 h-10" />
@@ -541,9 +528,9 @@ export function UploadHistory({ history, onCopy, onDelete, clipboardFormat, uplo
 
   return (
     <div className="space-y-4">
-      {/* Search and Controls — z-10 so it stays below the mobile menu (z-40/50) when opened */}
-      <div className="glass-card p-4 space-y-3 border border-border/30 relative z-10">
-        {/* Search Bar */}
+
+      <div className="glass-card p-3 space-y-3 relative z-10">
+
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
@@ -555,9 +542,8 @@ export function UploadHistory({ history, onCopy, onDelete, clipboardFormat, uplo
           />
         </div>
 
-        {/* Filters and View Toggle Row */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          {/* Category Filters */}
+
           <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
             {(['all', 'image', 'video', 'audio', 'document'] as const).map(f => (
               <button
@@ -565,8 +551,8 @@ export function UploadHistory({ history, onCopy, onDelete, clipboardFormat, uplo
                 onClick={() => handleFilterChange(f)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap border ${
                   filter === f
-                    ? 'bg-primary text-primary-foreground border-primary shadow-sm'
-                    : 'bg-secondary/30 text-muted-foreground hover:text-foreground hover:bg-secondary/50 border-border/30'
+                    ? 'bg-primary/10 text-primary border-primary/40'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60 border-border/60'
                 }`}
               >
                 {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -574,23 +560,22 @@ export function UploadHistory({ history, onCopy, onDelete, clipboardFormat, uplo
               </button>
             ))}
           </div>
-          
-          {/* Sort & View Controls */}
+
           <div className="flex items-center gap-2">
-            {/* Sort Dropdown */}
+
             <div className="relative">
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-secondary/30 hover:bg-secondary/50 rounded-lg text-xs font-medium text-foreground transition-all border border-border/30"
+                className="flex items-center gap-2 px-3 py-1.5 hover:bg-secondary/60 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground transition-colors border border-border/60"
               >
                 <ArrowUpDown className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Sort</span>
               </button>
-              
+
               {showFilters && (
                 <>
-                  <div 
-                    className="fixed inset-0 z-20" 
+                  <div
+                    className="fixed inset-0 z-20"
                     onClick={() => setShowFilters(false)}
                   />
                   <div className="absolute right-0 top-full mt-2 w-48 glass-card border border-border/50 rounded-lg shadow-xl z-30 overflow-hidden">
@@ -623,36 +608,33 @@ export function UploadHistory({ history, onCopy, onDelete, clipboardFormat, uplo
               )}
             </div>
 
-            {/* Results Count */}
             <span className="text-xs text-muted-foreground whitespace-nowrap">
               {filteredHistory.length} {filteredHistory.length === 1 ? 'file' : 'files'}
             </span>
 
-            {/* View Toggle */}
-            <div className="flex bg-secondary/30 rounded-lg p-1 border border-border/30">
+            <div className="flex bg-secondary/60 rounded-lg p-0.5">
               <button
                 onClick={() => setViewMode('grid')}
-                className={`p-1.5 rounded transition-all flex items-center justify-center ${viewMode === 'grid' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                className={`p-1.5 rounded transition-all flex items-center justify-center ${viewMode === 'grid' ? 'bg-card text-foreground shadow-sm ring-1 ring-border' : 'text-muted-foreground hover:text-foreground'}`}
                 title="Grid View"
               >
                 <Grid3x3 className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode('list')}
-                className={`p-1.5 rounded transition-all flex items-center justify-center ${viewMode === 'list' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                className={`p-1.5 rounded transition-all flex items-center justify-center ${viewMode === 'list' ? 'bg-card text-foreground shadow-sm ring-1 ring-border' : 'text-muted-foreground hover:text-foreground'}`}
                 title="List View"
               >
                 <LayoutList className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Select Mode Toggle */}
             <button
               onClick={toggleSelectMode}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
                 selectMode
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'bg-secondary/30 hover:bg-secondary/50 text-foreground border-border/30'
+                  ? 'bg-primary/10 text-primary border-primary/40'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60 border-border/60'
               }`}
             >
               {selectMode ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
@@ -662,7 +644,6 @@ export function UploadHistory({ history, onCopy, onDelete, clipboardFormat, uplo
         </div>
       </div>
 
-      {/* Bulk Action Bar */}
       {selectMode && selected.size > 0 && (
         <div className="glass-card p-3 flex items-center justify-between gap-3 border border-primary/30 animate-slide-up">
           <span className="text-sm font-medium text-foreground pl-1">
@@ -689,7 +670,6 @@ export function UploadHistory({ history, onCopy, onDelete, clipboardFormat, uplo
         </div>
       )}
 
-      {/* Grid View */}
       {viewMode === 'grid' && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {paginatedHistory.map((item, idx) => (
@@ -760,13 +740,12 @@ export function UploadHistory({ history, onCopy, onDelete, clipboardFormat, uplo
         </div>
       )}
 
-      {/* List View */}
       {viewMode === 'list' && (
         <div className="space-y-2">
           {paginatedHistory.map((item, idx) => {
             const category = getFileCategory(item)
             const previewUrl = getPreviewUrl(item.url)
-            
+
             return (
               <div
                 key={`${item.url}-${idx}`}
@@ -787,7 +766,7 @@ export function UploadHistory({ history, onCopy, onDelete, clipboardFormat, uplo
                     )}
                   </button>
                 )}
-                {/* Thumbnail */}
+
                 <button
                   onClick={() => (selectMode ? toggleSelected(item.url) : setPreviewItem(item))}
                   className="relative w-16 h-16 rounded-lg overflow-hidden bg-secondary/30 flex-shrink-0 border border-border/30 hover:border-primary/30 transition-all"
@@ -800,8 +779,7 @@ export function UploadHistory({ history, onCopy, onDelete, clipboardFormat, uplo
                     </div>
                   )}
                 </button>
-                
-                {/* Info */}
+
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm text-foreground truncate">{item.name}</p>
                   <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
@@ -815,8 +793,7 @@ export function UploadHistory({ history, onCopy, onDelete, clipboardFormat, uplo
                     )}
                   </div>
                 </div>
-                
-                {/* Actions */}
+
                 <div className="flex gap-1">
                   <button
                     onClick={() => handleCopy(item)}
@@ -854,9 +831,8 @@ export function UploadHistory({ history, onCopy, onDelete, clipboardFormat, uplo
         </div>
       )}
 
-      {/* No Results */}
       {filteredHistory.length === 0 && (
-        <div className="glass-card p-12 text-center border border-border/30">
+        <div className="glass-card p-12 text-center">
           <div className="flex justify-center mb-4">
             <div className="p-4 bg-secondary/50 rounded-2xl border border-border/30">
               <Search className="text-muted-foreground w-10 h-10" />
@@ -869,17 +845,16 @@ export function UploadHistory({ history, onCopy, onDelete, clipboardFormat, uplo
         </div>
       )}
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 pt-2">
           <button
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
             disabled={currentPage === 1}
-            className="p-2 rounded-lg bg-secondary/30 text-muted-foreground hover:text-foreground hover:bg-secondary/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all border border-border/30"
+            className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/60 disabled:opacity-40 disabled:cursor-not-allowed transition-colors border border-border/60"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
-          
+
           <div className="flex items-center gap-1">
             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
               let pageNum: number
@@ -892,15 +867,15 @@ export function UploadHistory({ history, onCopy, onDelete, clipboardFormat, uplo
               } else {
                 pageNum = currentPage - 2 + i
               }
-              
+
               return (
                 <button
                   key={pageNum}
                   onClick={() => setCurrentPage(pageNum)}
                   className={`w-8 h-8 rounded-lg text-xs font-medium transition-all border ${
                     currentPage === pageNum
-                      ? 'bg-primary text-primary-foreground border-primary shadow-sm'
-                      : 'bg-secondary/30 text-muted-foreground hover:text-foreground hover:bg-secondary/50 border-border/30'
+                      ? 'bg-primary/10 text-primary border-primary/40'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60 border-border/60'
                   }`}
                 >
                   {pageNum}
@@ -908,18 +883,17 @@ export function UploadHistory({ history, onCopy, onDelete, clipboardFormat, uplo
               )
             })}
           </div>
-          
+
           <button
             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
             disabled={currentPage === totalPages}
-            className="p-2 rounded-lg bg-secondary/30 text-muted-foreground hover:text-foreground hover:bg-secondary/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all border border-border/30"
+            className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/60 disabled:opacity-40 disabled:cursor-not-allowed transition-colors border border-border/60"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Preview Modal */}
       {previewItem && (
         <PreviewModal
           item={previewItem}

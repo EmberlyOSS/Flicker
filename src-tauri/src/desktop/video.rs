@@ -1,7 +1,3 @@
-/// Native video recording functionality (macOS)
-/// Uses macOS's built-in ScreenCaptureKit / AVFoundation pipeline via screencapture
-/// without requiring any external dependencies like FFmpeg.
-
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Instant;
@@ -20,8 +16,7 @@ async fn start_scap_mp4_recording(
     _show_clicks: bool,
     _fps: u32,
 ) -> Result<tokio::task::JoinHandle<()>, String> {
-    // Placeholder — system audio via scap will be fully implemented next iteration (openh264 + mp4 muxing).
-    // Returning Err forces fallback to screencapture in start_video_recording, which at least captures video (mic if enabled).
+
     Err("scap mp4 system-audio path not yet enabled — using screencapture fallback".to_string())
 }
 
@@ -36,7 +31,7 @@ pub struct VideoRegion {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VideoRecordOptions {
     pub region: Option<VideoRegion>,
-    pub include_audio: Option<bool>, // legacy: maps to system audio
+    pub include_audio: Option<bool>,
     pub include_system_audio: Option<bool>,
     pub include_mic: Option<bool>,
     pub show_clicks: Option<bool>,
@@ -52,7 +47,7 @@ pub struct VideoRecordingStatus {
 }
 
 pub struct ActiveRecording {
-    pub pid: Option<u32>, // for screencapture child
+    pub pid: Option<u32>,
     pub output_path: PathBuf,
     pub start_time: Instant,
     pub has_audio: bool,
@@ -64,12 +59,10 @@ pub struct ActiveRecording {
 
 static RECORDING_SESSION: Mutex<Option<ActiveRecording>> = Mutex::new(None);
 
-/// Check if video recording is currently in progress
 pub fn is_recording() -> bool {
     RECORDING_SESSION.lock().map(|guard| guard.is_some()).unwrap_or(false)
 }
 
-/// Get current recording status
 pub fn get_recording_status() -> VideoRecordingStatus {
     if let Ok(guard) = RECORDING_SESSION.lock() {
         if let Some(ref session) = *guard {
@@ -91,24 +84,23 @@ pub fn get_recording_status() -> VideoRecordingStatus {
     }
 }
 
-/// Start native screen video recording
 pub async fn start_video_recording(
     app: &AppHandle,
     options: Option<VideoRecordOptions>,
 ) -> Result<VideoRecordingStatus, String> {
-    println!("[Flicker] start_video_recording invoked options={:?}", options);
-    // Prevent concurrent recordings
+    crate::flog!("start_video_recording invoked options={:?}", options);
+
     {
         let guard = RECORDING_SESSION.lock().map_err(|e| e.to_string())?;
         if guard.is_some() {
-            eprintln!("[Flicker] start_video_recording blocked: already recording");
+            crate::flog_err!("start_video_recording blocked: already recording");
             return Err("A video recording is already in progress.".to_string());
         }
     }
 
     #[cfg(target_os = "macos")]
     {
-        // 1. Permission check on macOS
+
         if !crate::desktop::macos::has_screen_recording_permission() {
             let _ = crate::desktop::macos::request_screen_recording_permission();
             if !crate::desktop::macos::has_screen_recording_permission() {
@@ -117,7 +109,6 @@ pub async fn start_video_recording(
             }
         }
 
-        // 2. Prepare directory and filename — always .mp4, 10 min max
         let dir = get_recordings_dir()?;
         let filename = generate_recording_filename();
         let output_path = dir.join(&filename);
@@ -133,13 +124,11 @@ pub async fn start_video_recording(
 
         let has_system_audio = opts.include_system_audio.or(opts.include_audio).unwrap_or(config.video.include_system_audio);
         let has_mic = opts.include_mic.unwrap_or(config.video.include_mic);
-        // screencapture -g captures mic; system audio is captured automatically via ScreenCaptureKit on macOS 13+ when has_system_audio
+
         let has_audio = has_system_audio || has_mic;
         let show_clicks = opts.show_clicks.unwrap_or(config.video.show_clicks);
         let is_region = opts.region.is_some();
 
-        // 3. Build native recording — system audio requires scap (ScreenCaptureKit) — screencapture -v can't do system audio, -g is mic only
-        // For now, system audio capture via scap is in beta; we fallback to video without system audio and toast
         let _scap_handle_opt: Option<tokio::task::JoinHandle<()>> = None;
         let child = if has_system_audio {
             crate::desktop::app::send_os_notification(&app, "System Audio", "System audio capture via native ScreenCaptureKit is in beta — falling back to video without system audio for now. Mic will still be captured if enabled.");
@@ -165,7 +154,6 @@ pub async fn start_video_recording(
         };
         let pid = child.id();
 
-        // 5. Store active session
         let session = ActiveRecording {
             pid: Some(pid),
             output_path: output_path.clone(),
@@ -182,7 +170,6 @@ pub async fn start_video_recording(
             *guard = Some(session);
         }
 
-        // Auto-stop after max_duration (10 mins = 600s) — prevents runaway recordings
         let max_duration = config.video.max_duration_secs as u64;
         let app_clone = app.clone();
         tauri::async_runtime::spawn(async move {
@@ -201,7 +188,6 @@ pub async fn start_video_recording(
             is_region,
         };
 
-        // Notify app and frontend
         let _ = app.emit("video_recording_started", &status);
         if let Some(main) = app.get_webview_window("main") {
             let _ = main.emit("video_recording_started", &status);
@@ -224,31 +210,28 @@ pub async fn start_video_recording(
     }
 }
 
-/// Stop native screen video recording and optionally upload
 pub async fn stop_video_recording(
     app: &AppHandle,
     auto_upload: Option<bool>,
 ) -> Result<Option<UploadCompleteEvent>, String> {
-    println!("[Flicker] stop_video_recording invoked auto_upload={:?}", auto_upload);
+    crate::flog!("stop_video_recording invoked auto_upload={:?}", auto_upload);
     let session = {
         let mut guard = RECORDING_SESSION.lock().map_err(|e| e.to_string())?;
         let s = guard.take().ok_or_else(|| "No active video recording to stop.".to_string());
-        if s.is_err() { eprintln!("[Flicker] stop_video_recording: no active session"); }
+        if s.is_err() { crate::flog_err!("stop_video_recording: no active session"); }
         s?
     };
-    println!("[Flicker] stopping pid={:?} path={:?}", session.pid, session.output_path);
+    crate::flog!("stopping pid={:?} path={:?}", session.pid, session.output_path);
 
     #[cfg(target_os = "macos")]
     {
-        // 1. Send SIGINT to screencapture so it finalizes the MP4/MOV container cleanly
-        // Handle both pid (screencapture) and scap_handle (scap)
+
         if let Some(pid) = session.pid {
             #[cfg(unix)]
             unsafe {
                 libc::kill(pid as i32, libc::SIGINT);
             }
 
-            // 2. Wait up to 10 seconds for process to exit and finalize file writing
             let mut terminated = false;
             for _ in 0..100 {
                 #[cfg(unix)]
@@ -261,7 +244,6 @@ pub async fn stop_video_recording(
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             }
 
-            // Fallback: if not finished after 10s, send SIGTERM
             if !terminated {
                 #[cfg(unix)]
                 unsafe {
@@ -270,12 +252,11 @@ pub async fn stop_video_recording(
                 tokio::time::sleep(std::time::Duration::from_millis(300)).await;
             }
         } else if let Some(handle) = session.scap_handle {
-            // For scap, abort the capture task
+
             handle.abort();
             tokio::time::sleep(std::time::Duration::from_millis(500)).await;
         }
 
-        // 3. Verify output file exists and has valid size
         if !session.output_path.exists() {
             return Err("Recorded video file was not found on disk.".to_string());
         }
@@ -304,7 +285,6 @@ pub async fn stop_video_recording(
             let _ = main.emit("video_recording_stopped", &stop_payload);
         }
 
-        // 4. Check whether to upload
         let config = crate::common::load_config().unwrap_or_default();
         let should_upload = auto_upload.unwrap_or(config.video.auto_upload);
 
@@ -321,7 +301,7 @@ pub async fn stop_video_recording(
                 .clone()
                 .unwrap_or_else(|| "https://embrly.ca".to_string());
 
-            println!("[Flicker] video upload: starting {} ({} bytes) to {} visibility={}", file_path_str, file_size, api_url, config.visibility);
+            crate::flog!("video upload: starting {} ({} bytes) to {} visibility={}", file_path_str, file_size, api_url, config.visibility);
             let upload_resp = crate::common::upload_file(
                 file_path_str.clone(),
                 api_url,
@@ -333,20 +313,17 @@ pub async fn stop_video_recording(
             )
             .await
             .map_err(|e| {
-                eprintln!("[Flicker] video upload failed: {}", e);
+                crate::flog_err!("video upload failed: {}", e);
                 e
             })?;
-            println!("[Flicker] video upload success: url={} id={:?}", upload_resp.url, upload_resp.id);
+            crate::flog!("video upload success: url={} id={:?}", upload_resp.url, upload_resp.id);
 
             let event = crate::common::create_upload_event(upload_resp, Some(file_path_str));
 
-            // Copy to clipboard
             let _ = app.clipboard().write_text(event.url.clone());
 
-            // Notification
             crate::desktop::app::send_os_notification(&app, "Video Upload Complete", "URL copied to clipboard");
 
-            // Add to upload history
             let _ = crate::common::add_to_history(crate::common::UploadHistoryItem {
                 url: event.url.clone(),
                 name: event.name.clone(),
@@ -356,7 +333,6 @@ pub async fn stop_video_recording(
                 thumbnail_url: None,
             });
 
-            // Emit completion event to app & window
             let _ = app.emit("upload_complete", &event);
             if let Some(main) = app.get_webview_window("main") {
                 let _ = main.emit("upload_complete", &event);
@@ -375,7 +351,6 @@ pub async fn stop_video_recording(
     }
 }
 
-/// Cancel active video recording and discard file
 pub async fn cancel_video_recording(app: &AppHandle) -> Result<(), String> {
     let session = {
         let mut guard = RECORDING_SESSION.lock().map_err(|e| e.to_string())?;
@@ -390,7 +365,6 @@ pub async fn cancel_video_recording(app: &AppHandle) -> Result<(), String> {
                 libc::kill(pid as i32, libc::SIGINT);
             }
 
-            // Wait up to 3 seconds for termination
             for _ in 0..30 {
                 #[cfg(unix)]
                 unsafe {
@@ -405,7 +379,6 @@ pub async fn cancel_video_recording(app: &AppHandle) -> Result<(), String> {
             tokio::time::sleep(std::time::Duration::from_millis(500)).await;
         }
 
-        // Delete the incomplete/cancelled recording file
         if session.output_path.exists() {
             let _ = std::fs::remove_file(&session.output_path);
         }
@@ -426,7 +399,6 @@ pub async fn cancel_video_recording(app: &AppHandle) -> Result<(), String> {
     }
 }
 
-/// Toggle video recording: if recording, stops and uploads; if not, starts recording
 pub async fn toggle_video_recording(app: AppHandle) -> Result<(), String> {
     if is_recording() {
         let _ = stop_video_recording(&app, Some(true)).await?;

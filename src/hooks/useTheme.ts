@@ -1,11 +1,9 @@
 import { useState, useMemo } from 'react'
-import { DEFAULT_COLORS, THEME_PRESETS, type ColorConfig, hslToHex } from '../colors'
+import { DEFAULT_COLORS, DEFAULT_THEME_NAME, THEME_PRESETS, type ColorConfig, hslToHex } from '../colors'
 
 const THEME_STORAGE_KEY = 'emberly-uploader-theme'
+const EMBER_MIGRATION_KEY = 'flicker-ember-theme-migrated'
 
-/**
- * Convert HSL string (e.g., "222.2 84% 4.9%") to hex color
- */
 function hslStringToHex(hslString: string): string {
   const parts = hslString.split(' ')
   if (parts.length >= 3) {
@@ -17,9 +15,6 @@ function hslStringToHex(hslString: string): string {
   return '#000000'
 }
 
-/**
- * Apply CSS variables to :root
- */
 function applyColors(colorConfig: ColorConfig) {
   Object.entries(colorConfig).forEach(([key, value]) => {
     const cssKey = key.replace(/([A-Z])/g, '-$1').toLowerCase()
@@ -27,33 +22,27 @@ function applyColors(colorConfig: ColorConfig) {
   })
 }
 
-/**
- * Get the saved theme name from localStorage
- */
 function getSavedThemeName(): string {
-  if (typeof window === 'undefined') return 'Stranger Things'
+  if (typeof window === 'undefined') return DEFAULT_THEME_NAME
   try {
-    return localStorage.getItem(THEME_STORAGE_KEY) || 'Stranger Things'
+    if (!localStorage.getItem(EMBER_MIGRATION_KEY)) {
+      localStorage.setItem(THEME_STORAGE_KEY, DEFAULT_THEME_NAME)
+      localStorage.setItem(EMBER_MIGRATION_KEY, '1')
+    }
+    return localStorage.getItem(THEME_STORAGE_KEY) || DEFAULT_THEME_NAME
   } catch {
-    return 'Stranger Things'
+    return DEFAULT_THEME_NAME
   }
 }
 
-/**
- * Get colors for a theme name
- */
 function getThemeColors(themeName: string): ColorConfig {
   const preset = THEME_PRESETS.find((p) => p.name === themeName)
   return preset?.colors || DEFAULT_COLORS
 }
 
-// ============================================================================
-// SYNCHRONOUS THEME INITIALIZATION - runs before React renders
-// ============================================================================
 const initialThemeName = getSavedThemeName()
 const initialColors = getThemeColors(initialThemeName)
 
-// Apply theme immediately (this runs at module load time)
 if (typeof document !== 'undefined') {
   applyColors(initialColors)
 }
@@ -69,11 +58,9 @@ export interface ThemePreset {
 }
 
 export function useTheme() {
-  // Initialize with the already-applied theme (no flash!)
   const [currentTheme, setCurrentTheme] = useState(initialThemeName)
   const [colors, setColors] = useState<ColorConfig>(initialColors)
 
-  // Transform presets to include hex colors for UI previews
   const presets: ThemePreset[] = useMemo(() =>
     THEME_PRESETS.map(preset => ({
       name: preset.name,
@@ -86,9 +73,6 @@ export function useTheme() {
     })),
     [])
 
-  /**
-   * Switch to a different theme preset
-   */
   function switchTheme(themeName: string) {
     const preset = THEME_PRESETS.find((p) => p.name === themeName)
     if (preset) {
@@ -99,9 +83,6 @@ export function useTheme() {
     }
   }
 
-  /**
-   * Update custom color and apply
-   */
   function updateColor(colorKey: keyof ColorConfig, value: string) {
     const updated = { ...colors, [colorKey]: value }
     setColors(updated)

@@ -1,11 +1,6 @@
-/// File upload functionality for the Emberly API
-/// 
-/// Uses the EmberlyCient from emberly_api module for all HTTP operations
-
 use crate::common::emberly_api::EmberlyCient;
 use crate::common::types::{UploadResponse, UploadCompleteEvent};
 
-/// Upload a file to the Emberly instance
 pub async fn upload_file(
     file_path: String,
     api_url: String,
@@ -15,22 +10,19 @@ pub async fn upload_file(
     domain: Option<String>,
     on_progress: Option<Box<dyn Fn(u64, u64) + Send + Sync>>,
 ) -> Result<UploadResponse, String> {
-    // Validate inputs
+
     validate_api_url(&api_url)?;
     validate_upload_token(&upload_token)?;
 
-    // For very large files (>400MB, e.g., long video) use chunked; otherwise single POST like images
-    // User asked to "just upload it like you upload the image" — so default to single for typical 10m video (~50-150MB)
     let metadata = tokio::fs::metadata(&file_path)
         .await
         .map_err(|e| format!("Failed to read file metadata: {}", e))?;
     let total_size = metadata.len();
     const CHUNK_THRESHOLD: u64 = 400 * 1024 * 1024;
 
-    // Need to handle on_progress move: take it for chunked, fallback to None for single if chunked was tried
     let mut on_progress_opt = on_progress;
     if total_size > CHUNK_THRESHOLD {
-        println!("[Flicker] upload_file: {} bytes > threshold, using chunked", total_size);
+        crate::flog!("upload_file: {} bytes > threshold, using chunked", total_size);
         let res = upload_file_chunked(
             file_path.clone(),
             api_url.clone(),
@@ -44,22 +36,34 @@ pub async fn upload_file(
         match res {
             Ok(r) => return Ok(r),
             Err(e) => {
-                eprintln!("[Flicker] chunked failed ({}), falling back to single POST", e);
-                // fall through to single attempt with no progress
+                crate::flog_err!("chunked failed ({}), falling back to single POST", e);
+
                 on_progress_opt = None;
             }
         }
     } else {
-        println!("[Flicker] upload_file: {} bytes single POST to {}", total_size, api_url);
+        crate::flog!("upload_file: {} bytes single POST to {}", total_size, api_url);
     }
 
-    // Create API client and upload (single part)
     let client = EmberlyCient::new(api_url);
-    let api_response = client
+    let file_name = std::path::Path::new(&file_path)
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| file_path.clone());
+    let api_response = match client
         .upload_file(&upload_token, &file_path, &visibility, password, domain, on_progress_opt)
-        .await?;
+        .await
+    {
+        Ok(r) => {
+            crate::common::audit::record("upload", &format!("Uploaded {} ({})", file_name, r.url), "info");
+            r
+        }
+        Err(e) => {
+            crate::common::audit::record("upload_failed", &format!("Upload of {} failed: {}", file_name, e), "error");
+            return Err(e);
+        }
+    };
 
-    // Convert API response to our UploadResponse type
     Ok(UploadResponse {
         id: api_response.id,
         url: api_response.url,
@@ -93,18 +97,15 @@ async fn upload_file_chunked(
         .map_err(|e| e.to_string())?
         .len();
 
-    // 1. Init
     let (upload_id, part_size) = client
         .init_chunked_upload(&upload_token, &file_name, &mime_type, total_size, domain.clone())
         .await?;
 
-    // 2. Upload parts
     let mut parts = Vec::new();
     let mut offset: u64 = 0;
     let mut part_number: u32 = 1;
     let mut uploaded: u64 = 0;
 
-    // Open file for reading
     let mut file = tokio::fs::File::open(&file_path)
         .await
         .map_err(|e| e.to_string())?;
@@ -119,7 +120,6 @@ async fn upload_file_chunked(
             .get_chunk_url(&upload_token, &upload_id, part_number)
             .await?;
 
-        // PUT to S3
         let resp = reqwest::Client::new()
             .put(&presigned_url)
             .header("Content-Type", mime_type.clone())
@@ -142,7 +142,7 @@ async fn upload_file_chunked(
             .and_then(|v| v.to_str().ok())
             .unwrap_or("")
             .to_string();
-        // Ensure ETag is quoted as S3 expects
+
         let etag = if etag.starts_with('"') {
             etag
         } else {
@@ -158,12 +158,10 @@ async fn upload_file_chunked(
         part_number += 1;
     }
 
-    // 3. Complete
     let api_resp = client
         .complete_chunked_upload(&upload_token, &upload_id, parts, None)
         .await?;
 
-    // Chunked uploads are PUBLIC by default — patch visibility/password if needed
     if visibility != "PUBLIC" || _password.is_some() {
         let _ = client
             .update_file(
@@ -184,7 +182,6 @@ async fn upload_file_chunked(
     })
 }
 
-/// Create an upload complete event from an upload response
 pub fn create_upload_event(
     response: UploadResponse,
     screenshot_path: Option<String>,
@@ -199,25 +196,23 @@ pub fn create_upload_event(
     }
 }
 
-/// Validate API URL format
 pub fn validate_api_url(url: &str) -> Result<(), String> {
     if url.is_empty() {
         return Err("API URL cannot be empty".to_string());
     }
-    
+
     if !url.starts_with("http://") && !url.starts_with("https://") {
         return Err("API URL must start with http:// or https://".to_string());
     }
-    
+
     Ok(())
 }
 
-/// Validate upload token
 pub fn validate_upload_token(token: &str) -> Result<(), String> {
     if token.is_empty() {
         return Err("Upload token cannot be empty".to_string());
     }
-    
+
     Ok(())
 }
 

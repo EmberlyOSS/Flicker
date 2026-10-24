@@ -19,6 +19,13 @@ interface SidebarProps {
   showLogout?: boolean;
 }
 
+export const navItemClass = (active: boolean) =>
+  `w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${
+    active
+      ? 'bg-secondary text-foreground font-medium'
+      : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
+  }`;
+
 export function Sidebar({
   activeNav,
   onNavChange,
@@ -28,74 +35,63 @@ export function Sidebar({
   showLogout = true,
 }: SidebarProps) {
   return (
-    <aside className="desktop-sidebar glass-elevated border-r border-border/40 flex flex-col h-screen sticky top-0 rounded-none">
-      {/* Header */}
-      <div className="p-4 border-b border-border/30">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center border border-primary/30">
-            <Logo size={24} primaryColor="#ffffff" accentColor="hsl(var(--primary))" />
+    <aside className="desktop-sidebar sticky top-0 h-screen flex-col border-r border-border/70 bg-card/60 backdrop-blur-xl">
+      <div className="flex items-center gap-3 px-4 py-4">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
+          <Logo size={22} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h2 className="truncate text-sm font-semibold tracking-tight text-foreground">Flicker</h2>
+            <span className="rounded-md border border-primary/30 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+              v{APP_VERSION}
+            </span>
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h2 className="font-bold text-foreground truncate text-sm">Flicker</h2>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary font-medium">
-                v{APP_VERSION}
-              </span>
-            </div>
-            {username && <p className="text-xs text-muted-foreground truncate">{username}</p>}
-          </div>
+          {username && <p className="truncate text-xs text-muted-foreground">{username}</p>}
         </div>
       </div>
 
-      {/* Navigation Items */}
-      <nav className="flex-1 p-3 overflow-y-auto space-y-1">
-        {navItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => onNavChange(item.id)}
-            className={`w-full px-4 py-3 rounded-lg flex items-center gap-3 transition-all duration-200 font-medium text-sm group ${
-              activeNav === item.id
-                ? 'bg-primary text-primary-foreground shadow-md'
-                : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
-            }`}
-          >
-            <span className="flex-shrink-0">{item.icon}</span>
-            <span className="flex-1 text-left truncate">{item.label}</span>
-            {item.badge !== undefined && (
-              <span
-                className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${
-                  activeNav === item.id
-                    ? 'bg-primary-foreground/20 text-primary-foreground'
-                    : 'bg-primary/20 text-primary'
-                }`}
-              >
-                {item.badge}
-              </span>
-            )}
-          </button>
-        ))}
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-2">
+        <p className="px-3 pb-1.5 pt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
+          Flicker
+        </p>
+        {navItems.map((item) => {
+          const active = activeNav === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => onNavChange(item.id)}
+              aria-current={active ? 'page' : undefined}
+              className={navItemClass(active)}
+            >
+              <span className={`shrink-0 ${active ? 'text-primary' : ''}`}>{item.icon}</span>
+              <span className="flex-1 truncate text-left">{item.label}</span>
+              {item.badge !== undefined && (
+                <span className="shrink-0 rounded-md bg-secondary px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground">
+                  {item.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </nav>
 
-      {/* Footer */}
-      <div className="p-3 border-t border-border/30 space-y-2">
+      <div className="space-y-0.5 border-t border-border/60 p-2">
         <button
           onClick={() => onNavChange('settings')}
-          className={`w-full px-4 py-3 rounded-lg flex items-center gap-3 transition-all duration-200 font-medium text-sm ${
-            activeNav === 'settings'
-              ? 'bg-primary text-primary-foreground shadow-md'
-              : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
-          }`}
+          aria-current={activeNav === 'settings' ? 'page' : undefined}
+          className={navItemClass(activeNav === 'settings')}
         >
-          <Settings size={18} />
+          <Settings size={16} className={activeNav === 'settings' ? 'text-primary' : ''} />
           <span className="flex-1 text-left">Settings</span>
         </button>
 
         {showLogout && (
           <button
             onClick={onLogout}
-            className="w-full px-4 py-3 rounded-lg flex items-center gap-3 transition-all duration-200 font-medium text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+            className="w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
           >
-            <LogOut size={18} />
+            <LogOut size={16} />
             <span className="flex-1 text-left">Sign Out</span>
           </button>
         )}

@@ -20,7 +20,6 @@ export interface DeviceInfo {
   app_data_dir: string;
 }
 
-// Check if we're in a Tauri environment
 function isTauri(): boolean {
   return typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
 }
@@ -93,7 +92,7 @@ export function useAudit() {
   const exportAuditLogs = useCallback(
     async (): Promise<string | null> => {
       if (!isTauri()) {
-        // In browser, just return the current logs as JSON
+
         return JSON.stringify(logs, null, 2);
       }
 
@@ -116,7 +115,7 @@ export function useAudit() {
       metadata?: Record<string, unknown>
     ) => {
       if (!isTauri()) {
-        // In browser, just log to console
+
         console.log(`[AUDIT] [${level.toUpperCase()}] ${eventType}: ${message}`, metadata);
         return;
       }
@@ -128,7 +127,7 @@ export function useAudit() {
           level,
           metadata: metadata ?? null,
         });
-        // Refresh logs after adding
+
         await getAuditLogs();
       } catch (error) {
         console.error('Failed to log event:', error);

@@ -1,9 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
-import {
-  Bell, X, Check, CheckCheck, Trash2, Shield, AlertTriangle,
-  Upload, Download, Info, AlertCircle, CheckCircle, Clock
-} from 'lucide-react'
-import { AppNotification, NotificationCategory, NotificationPriority } from '../../types'
+import { Bell, X, Check, CheckCheck, Trash2, Shield, AlertTriangle, Upload, Download, Info, AlertCircle, CheckCircle } from 'lucide-react'
+import { AppNotification, NotificationCategory } from '../../types'
+import { timeAgo } from '../ui/kit'
 
 interface NotificationCenterProps {
   notifications: AppNotification[]
@@ -16,40 +14,18 @@ interface NotificationCenterProps {
   onAction?: (actionId: string, notification: AppNotification) => void
 }
 
-function getCategoryStyle(category: NotificationCategory) {
-  const styles: Record<NotificationCategory, { icon: typeof Bell; color: string; bg: string; border: string }> = {
-    admin: { icon: Shield, color: 'text-purple-400', bg: 'bg-purple-500/20', border: 'border-purple-500/30' },
-    security: { icon: AlertTriangle, color: 'text-orange-400', bg: 'bg-orange-500/20', border: 'border-orange-500/30' },
-    account: { icon: Info, color: 'text-blue-400', bg: 'bg-blue-500/20', border: 'border-blue-500/30' },
-    update: { icon: Download, color: 'text-cyan-400', bg: 'bg-cyan-500/20', border: 'border-cyan-500/30' },
-    upload: { icon: Upload, color: 'text-green-400', bg: 'bg-green-500/20', border: 'border-green-500/30' },
-    error: { icon: AlertCircle, color: 'text-red-400', bg: 'bg-red-500/20', border: 'border-red-500/30' },
-    success: { icon: CheckCircle, color: 'text-emerald-400', bg: 'bg-emerald-500/20', border: 'border-emerald-500/30' },
-    info: { icon: Info, color: 'text-blue-400', bg: 'bg-blue-500/20', border: 'border-blue-500/30' },
-  }
-  return styles[category] || styles.info
+const CATEGORY: Record<NotificationCategory, { icon: typeof Bell; color: string }> = {
+  admin: { icon: Shield, color: 'text-primary' },
+  security: { icon: AlertTriangle, color: 'text-amber-400' },
+  account: { icon: Info, color: 'text-muted-foreground' },
+  update: { icon: Download, color: 'text-primary' },
+  upload: { icon: Upload, color: 'text-emerald-400' },
+  error: { icon: AlertCircle, color: 'text-red-400' },
+  success: { icon: CheckCircle, color: 'text-emerald-400' },
+  info: { icon: Info, color: 'text-muted-foreground' },
 }
 
-function getPriorityBadge(priority: NotificationPriority) {
-  if (priority === 'system') {
-    return <span className="px-1.5 py-0.5 text-[10px] font-bold bg-red-500/20 text-red-400 rounded">SYSTEM</span>
-  }
-  if (priority === 'important') {
-    return <span className="px-1.5 py-0.5 text-[10px] font-bold bg-yellow-500/20 text-yellow-400 rounded">IMPORTANT</span>
-  }
-  return null
-}
-
-function formatRelativeTime(timestamp: number): string {
-  const diff = Date.now() - timestamp
-  const minutes = Math.floor(diff / 60000)
-  const hours = Math.floor(minutes / 60)
-  const days = Math.floor(hours / 24)
-  if (days > 0) return `${days}d ago`
-  if (hours > 0) return `${hours}h ago`
-  if (minutes > 0) return `${minutes}m ago`
-  return 'Just now'
-}
+const iconButton = 'rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground'
 
 function NotificationItem({
   notification,
@@ -64,57 +40,48 @@ function NotificationItem({
   onDelete: (id: string) => void
   onAction?: (actionId: string, notification: AppNotification) => void
 }) {
-  const style = getCategoryStyle(notification.category)
-  const Icon = style.icon
+  const { icon: Icon, color } = CATEGORY[notification.category] || CATEGORY.info
 
   return (
-    <div className={`relative p-3 rounded-lg border transition-all duration-200 ${notification.read ? 'bg-secondary/20 border-border/30' : `${style.bg} ${style.border}`
-      }`}>
-      {!notification.read && (
-        <div className="absolute w-2 h-2 rounded-full top-3 right-3 bg-primary animate-pulse" />
-      )}
-      <div className="flex gap-3">
-        <div className={`flex-shrink-0 w-8 h-8 rounded-lg ${style.bg} flex items-center justify-center`}>
-          <Icon size={16} className={style.color} />
+    <div className={`group relative flex gap-3 px-4 py-3 transition-colors hover:bg-secondary/40 ${notification.read ? '' : 'bg-primary/[0.04]'}`}>
+      {!notification.read && <span className="absolute left-1.5 top-[18px] h-1.5 w-1.5 rounded-full bg-primary" />}
+      <Icon size={16} className={`mt-0.5 shrink-0 ${color}`} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline justify-between gap-2">
+          <p className={`truncate text-sm ${notification.read ? 'text-foreground/80' : 'font-medium text-foreground'}`}>
+            {notification.title || notification.message}
+          </p>
+          <span className="shrink-0 text-[11px] text-muted-foreground group-hover:invisible">{timeAgo(notification.timestamp)}</span>
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2 mb-1">
-            <div className="flex flex-wrap items-center gap-2">
-              {notification.title && (
-                <span className="text-sm font-medium text-foreground">{notification.title}</span>
-              )}
-              {getPriorityBadge(notification.priority)}
-            </div>
-            <div className="flex items-center gap-1 text-muted-foreground">
-              <Clock size={10} />
-              <span className="text-[10px]">{formatRelativeTime(notification.timestamp)}</span>
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground line-clamp-2">{notification.message}</p>
-          {notification.action_label && notification.action_id && (
-            <button
-              onClick={() => onAction?.(notification.action_id!, notification)}
-              className="mt-2 px-3 py-1.5 text-xs font-medium bg-primary/20 text-primary rounded-lg hover:bg-primary/30 transition-colors"
-            >
-              {notification.action_label}
-            </button>
-          )}
-          <div className="flex items-center gap-2 mt-2">
-            {!notification.read && (
-              <button onClick={() => onMarkAsRead(notification.id)} className="p-1 transition-colors text-muted-foreground hover:text-foreground" title="Mark as read">
-                <Check size={14} />
-              </button>
-            )}
-            <button onClick={() => onDismiss(notification.id)} className="p-1 transition-colors text-muted-foreground hover:text-foreground" title="Dismiss">
-              <X size={14} />
-            </button>
-            {notification.priority !== 'system' && (
-              <button onClick={() => onDelete(notification.id)} className="p-1 transition-colors text-muted-foreground hover:text-red-400" title="Delete">
-                <Trash2 size={14} />
-              </button>
-            )}
-          </div>
-        </div>
+        {notification.title && <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{notification.message}</p>}
+        {(notification.priority === 'system' || notification.priority === 'important') && (
+          <span className={`mt-1 inline-block text-[10px] font-semibold uppercase tracking-wide ${notification.priority === 'system' ? 'text-red-400' : 'text-amber-400'}`}>
+            {notification.priority}
+          </span>
+        )}
+        {notification.action_label && notification.action_id && (
+          <button
+            onClick={() => onAction?.(notification.action_id!, notification)}
+            className="mt-2 block rounded-md border border-border/70 px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-secondary"
+          >
+            {notification.action_label}
+          </button>
+        )}
+      </div>
+      <div className="absolute right-3 top-2.5 hidden items-center gap-0.5 rounded-md bg-card/95 group-hover:flex">
+        {!notification.read && (
+          <button onClick={() => onMarkAsRead(notification.id)} className={iconButton} title="Mark as read">
+            <Check size={13} />
+          </button>
+        )}
+        <button onClick={() => onDismiss(notification.id)} className={iconButton} title="Dismiss">
+          <X size={13} />
+        </button>
+        {notification.priority !== 'system' && (
+          <button onClick={() => onDelete(notification.id)} className={`${iconButton} hover:text-destructive`} title="Delete">
+            <Trash2 size={13} />
+          </button>
+        )}
       </div>
     </div>
   )
@@ -125,14 +92,16 @@ export function NotificationCenter({ notifications, unreadCount, onMarkAsRead, o
   const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    if (!isOpen) return
     const handleClickOutside = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        setIsOpen(false)
-      }
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) setIsOpen(false)
     }
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
+    const handleKey = (e: KeyboardEvent) => e.key === 'Escape' && setIsOpen(false)
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleKey)
     }
   }, [isOpen])
 
@@ -140,38 +109,41 @@ export function NotificationCenter({ notifications, unreadCount, onMarkAsRead, o
 
   return (
     <div className="relative" ref={panelRef}>
-      <button onClick={() => setIsOpen(!isOpen)} className="relative p-2 transition-colors rounded-lg hover:bg-secondary/50" title="Notifications">
-        <Bell size={20} className="text-muted-foreground" />
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`relative flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-secondary ${isOpen ? 'bg-secondary text-foreground' : 'text-muted-foreground'}`}
+        title="Notifications"
+      >
+        <Bell size={18} />
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-bold bg-primary text-primary-foreground rounded-full">
+          <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 max-h-[70vh] glass-card border border-border rounded-xl shadow-2xl overflow-hidden z-50 animate-fade-in">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-secondary/30">
-            <div className="flex items-center gap-2">
-              <Bell size={16} className="text-primary" />
-              <span className="font-semibold text-foreground">Notifications</span>
-              {unreadCount > 0 && (
-                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-primary/20 text-primary rounded">{unreadCount} new</span>
-              )}
-            </div>
-            <div className="flex items-center gap-1">
-              {unreadCount > 0 && (
-                <button onClick={onMarkAllAsRead} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors" title="Mark all as read">
-                  <CheckCheck size={16} />
+        <div className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-border bg-card shadow-2xl animate-fade-in sm:w-96">
+          <div className="flex items-center justify-between border-b border-border/70 px-4 py-2.5">
+            <p className="text-sm font-semibold text-foreground">
+              Notifications
+              {unreadCount > 0 && <span className="ml-2 text-xs font-normal text-muted-foreground">{unreadCount} unread</span>}
+            </p>
+            {activeNotifications.length > 0 && (
+              <div className="flex items-center gap-0.5">
+                {unreadCount > 0 && (
+                  <button onClick={onMarkAllAsRead} className={iconButton} title="Mark all as read">
+                    <CheckCheck size={15} />
+                  </button>
+                )}
+                <button onClick={() => onClearAll(false)} className={iconButton} title="Clear all">
+                  <Trash2 size={15} />
                 </button>
-              )}
-              <button onClick={() => onClearAll(false)} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors" title="Clear all">
-                <Trash2 size={16} />
-              </button>
-            </div>
+              </div>
+            )}
           </div>
 
-          <div className="overflow-y-auto max-h-[calc(70vh-60px)] p-2 space-y-2">
+          <div className="max-h-[60vh] divide-y divide-border/50 overflow-y-auto">
             {activeNotifications.length > 0 ? (
               activeNotifications.map(notification => (
                 <NotificationItem
@@ -184,10 +156,9 @@ export function NotificationCenter({ notifications, unreadCount, onMarkAsRead, o
                 />
               ))
             ) : (
-              <div className="py-12 text-center">
-                <Bell size={32} className="mx-auto mb-3 text-muted-foreground/30" />
-                <p className="text-sm text-muted-foreground">No notifications</p>
-                <p className="mt-1 text-xs text-muted-foreground/60">You're all caught up!</p>
+              <div className="flex flex-col items-center gap-2 px-6 py-10 text-center">
+                <Bell size={22} className="text-muted-foreground/40" />
+                <p className="text-sm text-muted-foreground">You're all caught up</p>
               </div>
             )}
           </div>

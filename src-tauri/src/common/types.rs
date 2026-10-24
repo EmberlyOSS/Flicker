@@ -1,8 +1,5 @@
-/// Shared types and data structures for the Flicker application
-
 use serde::{Deserialize, Serialize};
 
-/// Response from the Emberly file upload API
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct UploadResponse {
     pub id: Option<String>,
@@ -13,7 +10,6 @@ pub struct UploadResponse {
     pub file_type: String,
 }
 
-/// Screenshot result with file path and dimensions
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ScreenshotResult {
     pub path: String,
@@ -21,7 +17,6 @@ pub struct ScreenshotResult {
     pub height: u32,
 }
 
-/// Upload result with URL for clipboard
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct UploadCompleteEvent {
     pub id: Option<String>,
@@ -32,7 +27,6 @@ pub struct UploadCompleteEvent {
     pub screenshot_path: Option<String>,
 }
 
-/// Emitted repeatedly while a file is being streamed to the server
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct UploadProgressEvent {
     pub file_path: String,
@@ -41,7 +35,6 @@ pub struct UploadProgressEvent {
     pub percentage: f64,
 }
 
-/// Monitor information
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MonitorInfo {
     pub index: usize,
@@ -54,7 +47,6 @@ pub struct MonitorInfo {
     pub scale_factor: f64,
 }
 
-/// System information
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SystemInfo {
     pub platform: String,
@@ -63,7 +55,6 @@ pub struct SystemInfo {
     pub screenshots_dir: Option<String>,
 }
 
-/// Platform capabilities - what the app can do on this system
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PlatformCapabilities {
     pub platform: String,
@@ -72,11 +63,10 @@ pub struct PlatformCapabilities {
     pub multi_monitor: bool,
     pub system_tray: bool,
     pub clipboard_access: bool,
-    pub file_access: String,  // "full" or "restricted"
+    pub file_access: String,
     pub elevation_support: bool,
 }
 
-/// Visibility levels for uploads
 #[derive(Debug, Clone, PartialEq)]
 pub enum UploadVisibility {
     Public,

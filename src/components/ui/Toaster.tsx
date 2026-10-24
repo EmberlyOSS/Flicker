@@ -55,9 +55,9 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
       text: 'text-red-300',
     },
     info: {
-      bg: 'bg-blue-500/20 border-blue-500/40',
-      icon: <Info className="w-5 h-5 text-blue-400" />,
-      text: 'text-blue-300',
+      bg: 'bg-card border-border',
+      icon: <Info className="w-5 h-5 text-primary" />,
+      text: 'text-foreground',
     },
   }
 
@@ -83,7 +83,6 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
   )
 }
 
-// Hook for managing toasts
 let toastId = 0
 
 export function useToaster() {

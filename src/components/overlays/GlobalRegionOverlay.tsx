@@ -28,11 +28,6 @@ function getRect(d: DragState): Region {
   return { x, y, width, height }
 }
 
-/**
- * Global region overlay - runs in its own transparent fullscreen window (region-overlay-*)
- * Works system-wide even when main app is hidden/backgrounded.
- * Each monitor gets its own overlay window; selection is per-monitor.
- */
 export function GlobalRegionOverlay() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [drag, setDrag] = useState<DragState | null>(null)
@@ -40,23 +35,22 @@ export function GlobalRegionOverlay() {
   const dragRef = useRef<DragState | null>(null)
   const [monitorIndex, setMonitorIndex] = useState<number>(0)
   const [isProcessing, setIsProcessing] = useState(false)
-  // Synchronous guard to prevent double-invoke (fixes “billion uploads” — state is async, ref is sync)
+
   const processingRef = useRef(false)
 
-  // Resolve monitor index from window label or URL query
   useEffect(() => {
     const resolve = async () => {
       try {
         const win = getCurrentWindow()
         const label = win.label
-        // label is like "region-overlay-0"
+
         const m = label.match(/region-overlay-(\d+)/)
         if (m) {
           setMonitorIndex(parseInt(m[1], 10))
           return
         }
       } catch {}
-      // Fallback to query param
+
       const params = new URLSearchParams(window.location.search)
       const q = params.get('monitor')
       if (q) setMonitorIndex(parseInt(q, 10) || 0)
@@ -76,33 +70,27 @@ export function GlobalRegionOverlay() {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-    // Dark overlay - semi-transparent to still see what's behind
     ctx.fillStyle = 'rgba(0, 0, 0, 0.35)'
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
     if (d?.dragging) {
       const rect = getRect(d)
 
-      // Cut out selected region (clear to reveal desktop behind)
-      // Use destination-out to punch hole, but clearRect works since we just filled
       ctx.clearRect(rect.x, rect.y, rect.width, rect.height)
 
-      // Subtle border around selection
-      ctx.strokeStyle = 'rgba(99, 102, 241, 1)'
+      ctx.strokeStyle = 'rgba(249, 115, 22, 1)'
       ctx.lineWidth = 2
       ctx.setLineDash([])
       ctx.strokeRect(rect.x, rect.y, rect.width, rect.height)
 
-      // Dashed outer border for contrast
       ctx.strokeStyle = 'rgba(255,255,255,0.9)'
       ctx.lineWidth = 1
       ctx.setLineDash([6, 4])
       ctx.strokeRect(rect.x - 0.5, rect.y - 0.5, rect.width + 1, rect.height + 1)
       ctx.setLineDash([])
 
-      // Corner handles
       const handleSize = 8
-      ctx.fillStyle = 'rgba(99, 102, 241, 1)'
+      ctx.fillStyle = 'rgba(249, 115, 22, 1)'
       ctx.strokeStyle = 'white'
       ctx.lineWidth = 1
       const corners: [number, number][] = [
@@ -116,7 +104,6 @@ export function GlobalRegionOverlay() {
         ctx.strokeRect(cx - handleSize / 2, cy - handleSize / 2, handleSize, handleSize)
       }
 
-      // Dimension label
       if (rect.width > 40 && rect.height > 20) {
         const label = `${Math.round(rect.width)} × ${Math.round(rect.height)}`
         ctx.font = 'bold 12px ui-monospace, monospace'
@@ -125,7 +112,7 @@ export function GlobalRegionOverlay() {
         const labelYBelow = rect.y + rect.height + 8
         const finalY = labelYBelow + 22 > canvas.height ? rect.y - 30 : labelYBelow
 
-        ctx.fillStyle = 'rgba(79, 70, 229, 0.95)'
+        ctx.fillStyle = 'rgba(194, 65, 12, 0.95)'
         ctx.beginPath()
         // @ts-ignore roundRect may not be in older lib
         if (ctx.roundRect) ctx.roundRect(labelX, finalY, textW, 20, 6)
@@ -137,7 +124,6 @@ export function GlobalRegionOverlay() {
       }
     }
 
-    // Crosshair lines (thinner, follow cursor)
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)'
     ctx.lineWidth = 1
     ctx.setLineDash([4, 4])
@@ -151,7 +137,6 @@ export function GlobalRegionOverlay() {
     ctx.stroke()
     ctx.setLineDash([])
 
-    // Coordinate tooltip near cursor
     const coordLabel = `${Math.round(mx)}, ${Math.round(my)}`
     ctx.font = '11px ui-monospace, monospace'
     const cw = ctx.measureText(coordLabel).width + 12
@@ -166,7 +151,7 @@ export function GlobalRegionOverlay() {
     if (ctx.roundRect) ctx.roundRect(tipX, tipY, cw, 18, 4)
     else ctx.fillRect(tipX, tipY, cw, 18)
     ctx.fill()
-    ctx.fillStyle = 'rgba(200, 210, 255, 1)'
+    ctx.fillStyle = 'rgba(254, 215, 170, 1)'
     ctx.fillText(coordLabel, tipX + 6, tipY + 12)
   }, [])
 
@@ -174,7 +159,7 @@ export function GlobalRegionOverlay() {
     const canvas = canvasRef.current
     if (!canvas) return
     const updateSize = () => {
-      // Use physical pixel ratio for crisp rendering
+
       const dpr = window.devicePixelRatio || 1
       canvas.width = window.innerWidth * dpr
       canvas.height = window.innerHeight * dpr
@@ -182,14 +167,10 @@ export function GlobalRegionOverlay() {
       canvas.style.height = `${window.innerHeight}px`
       const ctx = canvas.getContext('2d')
       if (ctx) ctx.scale(dpr, dpr)
-      // But our draw expects logical coordinates, so we reset transform handling:
-      // Simpler: keep canvas logical size and let CSS handle scaling; we already scale context
-      // So we need to adjust draw to use logical sizes.
-      // For now revert to logical: set width/height to innerWidth/innerHeight without dpr scaling
-      // to avoid double scaling confusion with capture.
+
       canvas.width = window.innerWidth
       canvas.height = window.innerHeight
-      // Reset scale
+
       const ctx2 = canvas.getContext('2d')
       if (ctx2) ctx2.setTransform(1, 0, 0, 1, 0, 0)
       draw(dragRef.current, mousePos.x, mousePos.y)
@@ -209,7 +190,7 @@ export function GlobalRegionOverlay() {
       await invoke('cancel_region_capture')
     } catch (e) {
       console.error('Cancel failed', e)
-      // Fallback: close this window directly
+
       try {
         const win = getCurrentWindow()
         await win.close()
@@ -229,8 +210,7 @@ export function GlobalRegionOverlay() {
     const isTinyClick = region.width < 5 || region.height < 5
 
     try {
-    // Overlay windows have isolated localStorage — token may be empty here even though main window is logged in.
-    // Try localStorage first, then fallback to Rust disk config (authoritative).
+
     let config = loadConfig()
     let token: string | null = config.uploadToken || null
     let apiUrl = config.uploadUrl || 'https://embrly.ca'
@@ -239,11 +219,11 @@ export function GlobalRegionOverlay() {
     if (!token) {
       try {
         const rustCfg: any = await invoke('load_config')
-        // Rust config uses snake_case: upload_token, upload_url
+
         token = rustCfg.upload_token || rustCfg.uploadToken || rustCfg.upload_token?.trim() || null
         apiUrl = rustCfg.upload_url || rustCfg.uploadUrl || apiUrl
         visibility = rustCfg.visibility || visibility
-        // preferredDomain is not in Rust config yet, keep as is
+
       } catch {}
     }
     if (!token) {
@@ -254,11 +234,9 @@ export function GlobalRegionOverlay() {
 
     const scale = window.devicePixelRatio || 1
 
-      // Single click without drag → capture the window under cursor (fixes Helium tabs not captured)
-      // Drag → capture the selected region
       let result: any
       if (isTinyClick) {
-        // Use window capture which includes full window chrome (tabs, title bar) via screencapture -R
+
         result = await invoke<any>('capture_window_and_upload', {
           x: region.x,
           y: region.y,
@@ -270,8 +248,7 @@ export function GlobalRegionOverlay() {
           domain,
         })
       } else {
-        // Use combined capture+upload command (handles closing overlay before capture internally)
-        // Guarded in Rust via REGION_CAPTURING AtomicBool — prevents “billion uploads” on rapid triggers
+
         result = await invoke<any>('capture_region_and_upload', {
           monitorIndex,
           x: region.x,
@@ -286,7 +263,6 @@ export function GlobalRegionOverlay() {
         })
       }
 
-      // Success: Rust already did clipboard + OS notification + history (works even when app hidden)
       if (result?.url) {
         try { await writeText(result.url) } catch {}
         console.log('Captured uploaded:', result.url)
@@ -294,18 +270,18 @@ export function GlobalRegionOverlay() {
     } catch (e) {
       console.error('Region capture failed', e)
       const msg = e instanceof Error ? e.message : String(e)
-      // Ignore “already in progress” — it’s the guard preventing spam
+
       if (msg.includes('already in progress')) {
         return
       }
-      // Still try to close overlay
+
       try { await invoke('cancel_region_capture') } catch {}
       try { await sendNotification({ title: 'Capture failed', body: msg.slice(0, 120) }) } catch {}
     } finally {
       setIsProcessing(false)
-      // Keep ref true for a short cooldown to absorb duplicate mouseUp events (fixes spam)
+
       setTimeout(() => { processingRef.current = false }, 1200)
-      // Ensure overlay closes; if Rust didn't close (error case), close this window
+
       try {
         const win = getCurrentWindow()
         setTimeout(async () => {
@@ -321,7 +297,7 @@ export function GlobalRegionOverlay() {
   }, [])
 
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    // Left click only for selection; right click cancels (ShareX behavior)
+
     if (e.button === 2) {
       e.preventDefault()
       handleCancel()
@@ -340,14 +316,14 @@ export function GlobalRegionOverlay() {
 
   const handleMouseUp = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
-      // Guard against double-fire (canvas + window) and spam
+
       if (processingRef.current) return
       if (!drag?.dragging) return
-      // Right button already handled
+
       if (e.button === 2) return
       e.preventDefault()
       const rect = getRect(drag)
-      // Reset visual state immediately — but keep drag ref until handleSelect completes
+
       setDrag(null)
       handleSelect(rect)
     },
@@ -378,7 +354,7 @@ export function GlobalRegionOverlay() {
       }
     }
     window.addEventListener('keydown', handleKeyDown)
-    // Also handle right-click outside canvas (instruction banner area)
+
     window.addEventListener('contextmenu', preventContext)
     window.addEventListener('mouseup', handleGlobalContext as unknown as EventListener)
     return () => {
@@ -411,7 +387,6 @@ export function GlobalRegionOverlay() {
         onContextMenu={handleContextMenu}
       />
 
-      {/* Top instruction - hidden while dragging */}
       {!drag?.dragging && !isProcessing && (
         <div
           style={{
@@ -478,7 +453,6 @@ export function GlobalRegionOverlay() {
         </div>
       )}
 
-      {/* Cancel button */}
       {!isProcessing && (
         <button
           onClick={handleCancel}
@@ -505,7 +479,6 @@ export function GlobalRegionOverlay() {
         </button>
       )}
 
-      {/* Monitor indicator */}
       <div
         style={{
           position: 'absolute',

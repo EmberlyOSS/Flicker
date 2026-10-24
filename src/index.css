@@ -2,7 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Font Family Variables */
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/Inter.ttf') format('truetype');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
 :root {
   --font-system: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --font-inter: 'Inter', var(--font-system);
@@ -11,25 +17,21 @@
   --font-poppins: 'Poppins', var(--font-system);
 }
 
-/* Font Family - Applied to html element */
 html[data-font="system"], html[data-font="system"] body { font-family: var(--font-system); }
 html[data-font="inter"], html[data-font="inter"] body { font-family: var(--font-inter); }
 html[data-font="roboto"], html[data-font="roboto"] body { font-family: var(--font-roboto); }
 html[data-font="mono"], html[data-font="mono"] body { font-family: var(--font-mono); }
 html[data-font="poppins"], html[data-font="poppins"] body { font-family: var(--font-poppins); }
 
-/* Font Size - Scale the base */
 html[data-font-size="small"] { font-size: 14px; }
 html[data-font-size="medium"] { font-size: 16px; }
 html[data-font-size="large"] { font-size: 18px; }
 
-/* Border Radius - Update CSS variable */
 html[data-radius="none"] { --radius: 0px; }
 html[data-radius="small"] { --radius: 0.25rem; }
 html[data-radius="medium"] { --radius: 0.5rem; }
 html[data-radius="large"] { --radius: 0.75rem; }
 
-/* Animation Toggle - Disable all animations */
 html[data-animations="false"] *,
 html[data-animations="false"] *::before,
 html[data-animations="false"] *::after {
@@ -38,14 +40,12 @@ html[data-animations="false"] *::after {
   transition-duration: 0.001ms !important;
 }
 
-/* Glass Effect Toggle */
 html[data-glass="false"] .glass-card {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   background: hsl(var(--card)) !important;
 }
 
-/* Compact Mode - Reduce spacing */
 html[data-compact="true"] {
   --spacing-scale: 0.75;
 }
@@ -64,145 +64,29 @@ html[data-compact="true"] .gap-6 { gap: 1rem; }
 html[data-compact="true"] .gap-4 { gap: 0.75rem; }
 html[data-compact="true"] .gap-3 { gap: 0.5rem; }
 
-/* Default Theme - Stranger Things (Hawkins Neon) */
 :root {
-  --background: 232 36% 6%;
-  --foreground: 210 40% 96%;
-  --card: 230 32% 8%;
-  --card-foreground: 210 40% 96%;
-  --popover: 230 32% 8%;
-  --popover-foreground: 210 40% 96%;
-  --primary: 354 82% 52%;
-  --primary-foreground: 210 40% 98%;
-  --secondary: 230 28% 16%;
-  --secondary-foreground: 210 40% 96%;
-  --muted: 232 20% 24%;
-  --muted-foreground: 215 16% 72%;
-  --accent: 197 92% 54%;
-  --accent-foreground: 222 47% 12%;
-  --destructive: 354 82% 45%;
-  --destructive-foreground: 210 40% 98%;
-  --success: 142 76% 36%;
-  --success-foreground: 210 40% 98%;
-  --border: 230 30% 14%;
-  --input: 230 30% 14%;
-  --ring: 197 100% 60%;
-  --radius: 0.5rem;
-}
-
-/* Cyberpunk Neon Theme */
-[data-theme="cyberpunk-neon"] {
-  --background: 270 20% 5%;
-  --foreground: 210 40% 98%;
-  --card: 270 25% 8%;
-  --card-foreground: 210 40% 98%;
-  --popover: 270 25% 8%;
-  --popover-foreground: 210 40% 98%;
-  --primary: 180 100% 45%;
-  --primary-foreground: 270 20% 5%;
-  --secondary: 300 100% 48%;
-  --secondary-foreground: 270 20% 5%;
-  --muted: 270 20% 18%;
-  --muted-foreground: 215 20% 65.1%;
-  --accent: 0 100% 50%;
-  --accent-foreground: 270 20% 5%;
-  --destructive: 0 100% 50%;
-  --destructive-foreground: 210 40% 98%;
-  --border: 270 20% 14%;
-  --input: 270 20% 14%;
-  --ring: 180 100% 55%;
-}
-
-/* Hawkins Neon (Stranger Things) */
-[data-theme="hawkins-neon"] {
-  --background: 232 36% 6%;
-  --foreground: 210 40% 96%;
-  --card: 230 32% 8%;
-  --card-foreground: 210 40% 96%;
-  --popover: 230 32% 8%;
-  --popover-foreground: 210 40% 96%;
-  --primary: 354 82% 52%;
-  --primary-foreground: 210 40% 98%;
-  --secondary: 230 28% 16%;
-  --secondary-foreground: 210 40% 96%;
-  --muted: 232 20% 24%;
-  --muted-foreground: 215 16% 72%;
-  --accent: 197 92% 54%;
-  --accent-foreground: 222 47% 12%;
-  --destructive: 0 65% 46%;
-  --destructive-foreground: 210 40% 98%;
-  --border: 230 22% 18%;
-  --input: 230 22% 18%;
-  --ring: 354 82% 56%;
-}
-
-/* Retro Arcade */
-[data-theme="retro-arcade"] {
-  --background: 280 25% 8%;
-  --foreground: 210 40% 98%;
-  --card: 280 30% 10%;
-  --card-foreground: 210 40% 98%;
-  --popover: 280 30% 10%;
-  --popover-foreground: 210 40% 98%;
-  --primary: 300 100% 50%;
-  --primary-foreground: 280 25% 8%;
-  --secondary: 45 100% 50%;
-  --secondary-foreground: 280 25% 8%;
-  --muted: 280 20% 20%;
-  --muted-foreground: 215 20% 65.1%;
-  --accent: 0 100% 50%;
-  --accent-foreground: 280 25% 8%;
-  --destructive: 0 100% 50%;
-  --destructive-foreground: 210 40% 98%;
-  --border: 280 20% 16%;
-  --input: 280 20% 16%;
-  --ring: 300 100% 60%;
-}
-
-/* Dark Matrix */
-[data-theme="dark-matrix"] {
-  --background: 120 40% 5%;
-  --foreground: 120 100% 90%;
-  --card: 120 35% 7%;
-  --card-foreground: 120 100% 90%;
-  --popover: 120 35% 7%;
-  --popover-foreground: 120 100% 90%;
-  --primary: 120 100% 50%;
-  --primary-foreground: 120 40% 5%;
-  --secondary: 220 30% 15%;
-  --secondary-foreground: 120 100% 90%;
-  --muted: 120 30% 16%;
-  --muted-foreground: 120 80% 70%;
-  --accent: 60 100% 50%;
-  --accent-foreground: 120 40% 5%;
-  --destructive: 0 100% 45%;
-  --destructive-foreground: 120 100% 90%;
-  --border: 120 30% 12%;
-  --input: 120 30% 12%;
-  --ring: 120 100% 60%;
-}
-
-/* Vaporwave */
-[data-theme="vaporwave"] {
-  --background: 300 40% 8%;
-  --foreground: 210 40% 98%;
-  --card: 300 35% 10%;
-  --card-foreground: 210 40% 98%;
-  --popover: 300 35% 10%;
-  --popover-foreground: 210 40% 98%;
-  --primary: 280 80% 50%;
-  --primary-foreground: 300 40% 8%;
-  --secondary: 40 100% 50%;
-  --secondary-foreground: 300 40% 8%;
-  --muted: 300 30% 20%;
-  --muted-foreground: 215 20% 65.1%;
-  --accent: 200 100% 50%;
-  --accent-foreground: 300 40% 8%;
-  --destructive: 20 100% 50%;
-  --destructive-foreground: 210 40% 98%;
-  --border: 300 30% 16%;
-  --input: 300 30% 16%;
-  --ring: 280 80% 60%;
+  --background: 20 14% 4%;
+  --foreground: 30 20% 96%;
+  --card: 20 12% 6.5%;
+  --card-foreground: 30 20% 96%;
+  --popover: 20 12% 7%;
+  --popover-foreground: 30 20% 96%;
+  --primary: 24.6 95% 53.1%;
+  --primary-foreground: 20 30% 8%;
+  --secondary: 20 10% 13%;
+  --secondary-foreground: 30 20% 96%;
+  --muted: 20 10% 13%;
+  --muted-foreground: 25 8% 64%;
+  --accent: 20 10% 14%;
+  --accent-foreground: 30 20% 96%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 98%;
+  --success: 142 71% 45%;
+  --success-foreground: 0 0% 98%;
+  --border: 20 9% 15%;
+  --input: 20 9% 17%;
+  --ring: 24.6 95% 53.1%;
+  --radius: 0.75rem;
 }
 
 * {
@@ -238,14 +122,14 @@ body {
   }
 }
 
-/* ─── Surface tiers — aligned with embrly.ca's design system ───────────────── */
-
 .glass {
-  background: hsl(var(--background) / 0.8);
+  background: hsl(var(--card) / 0.8);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid hsl(var(--border) / 0.5);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  border: 1px solid hsl(var(--border) / 0.7);
+  box-shadow:
+    inset 0 1px 0 hsl(var(--foreground) / 0.04),
+    0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .glass-hover {
@@ -253,47 +137,38 @@ body {
 }
 
 .glass-hover:hover {
-  background: hsl(var(--background) / 0.9);
+  background: hsl(var(--card));
   border-color: hsl(var(--border));
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .glass-card {
-  background: hsl(var(--background) / 0.8);
+  background: hsl(var(--card) / 0.8);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid hsl(var(--border) / 0.5);
-  border-radius: calc(var(--radius) * 1.5);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-  transition: all 200ms ease;
+  border: 1px solid hsl(var(--border) / 0.7);
+  border-radius: calc(var(--radius) * 1.33);
+  box-shadow:
+    inset 0 1px 0 hsl(var(--foreground) / 0.04),
+    0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
-.glass-card:hover {
-  border-color: hsl(var(--primary) / 0.25);
-  box-shadow: 0 0 0 1px hsl(var(--primary) / 0.1);
-}
-
-/* Elevated surface — for navbars, sidebars, and other persistent chrome */
 .glass-elevated {
-  background: hsl(var(--background) / 0.7);
+  background: hsl(var(--card) / 0.75);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid hsl(var(--border) / 0.4);
+  border: 1px solid hsl(var(--border) / 0.7);
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.08),
     0 4px 16px -4px rgba(0, 0, 0, 0.12);
 }
 
-/* Subtle surface — for nested panels inside other containers */
 .glass-subtle {
-  background: hsl(var(--background) / 0.8);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid hsl(var(--border) / 0.5);
-  border-radius: calc(var(--radius) * 1.25);
+  background: hsl(var(--muted) / 0.3);
+  border: 1px solid hsl(var(--border) / 0.6);
+  border-radius: var(--radius);
 }
 
-/* ─── Glow utilities ─────────────────────────────────────────────────────── */
 
 .glow-primary {
   box-shadow: 0 0 24px -8px hsl(var(--primary) / 0.12);
@@ -309,7 +184,6 @@ body {
     0 0 40px -8px hsl(var(--primary) / 0.1);
 }
 
-/* ─── Animated gradient border ───────────────────────────────────────────── */
 
 .gradient-border-animated {
   position: relative;
@@ -348,7 +222,6 @@ body {
   100% { background-position: 0% 50%; }
 }
 
-/* Liquid Glass Button */
 .glass-button {
   background: linear-gradient(
     135deg,
@@ -378,7 +251,6 @@ body {
     inset 0 1px 0 hsl(var(--foreground) / 0.1);
 }
 
-/* Subtle Glow Effect */
 .glow {
   position: relative;
 }
@@ -403,11 +275,6 @@ body {
   opacity: 1;
 }
 
-.glass-card:hover {
-  border-color: hsl(var(--primary) / 0.3);
-}
-
-/* Custom Gradients - Enhanced with Liquid Glass Feel */
 .gradient-border {
   position: relative;
   border: 1px solid transparent;
@@ -428,7 +295,6 @@ body {
   min-height: 100vh;
 }
 
-/* Animated gradient background for special elements */
 .gradient-animated {
   background: linear-gradient(
     -45deg,
@@ -446,7 +312,6 @@ body {
   50% { background-position: 100% 50%; }
 }
 
-/* Upload zone */
 .upload-zone {
   background-color: hsl(var(--card) / 0.5);
   border: 2px dashed hsl(var(--border));
@@ -460,7 +325,6 @@ body {
   background: hsl(var(--primary) / 0.05);
 }
 
-/* Button styles matching Emberly */
 .btn-primary {
   background-color: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
@@ -487,7 +351,6 @@ body {
   background-color: hsl(var(--secondary) / 0.8);
 }
 
-/* Input styles */
 .input-field {
   background-color: hsl(var(--background));
   border: 1px solid hsl(var(--input));
@@ -502,7 +365,6 @@ body {
   box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2);
 }
 
-/* Badge styles */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -514,7 +376,6 @@ body {
   color: hsl(var(--primary));
 }
 
-/* Input number spinner removal */
 input::-webkit-outer-spin-button,
 input::-webkit-inner-spin-button {
   -webkit-appearance: none;
@@ -525,7 +386,6 @@ input[type='number'] {
   -moz-appearance: textfield;
 }
 
-/* Custom scrollbar - matching Emberly site */
 ::-webkit-scrollbar {
   width: 14px;
 }
@@ -546,7 +406,6 @@ input[type='number'] {
   scrollbar-color: hsl(var(--muted-foreground)) transparent;
 }
 
-/* Animations - From Emberly globals */
 .animate-fade-in {
   animation: fadeIn 0.5s ease-out;
 }
